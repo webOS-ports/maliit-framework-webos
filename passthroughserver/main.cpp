@@ -140,7 +140,7 @@ QSharedPointer<MInputContextConnection> createConnection(const MImServerConnecti
 {
     Q_UNUSED(options);
 #ifdef HAVE_WAYLAND
-    if (QGuiApplication::platformName().startsWith("wayland")) {
+    if (QGuiApplication::platformName().contains("wayland")) {
         return QSharedPointer<MInputContextConnection>(Maliit::createWestonIMProtocolConnection());
     }
 #endif
@@ -152,7 +152,7 @@ QSharedPointer<MInputContextConnection> createConnection(const MImServerConnecti
 QSharedPointer<Maliit::AbstractPlatform> createPlatform()
 {
 #ifdef HAVE_WAYLAND
-    if (QGuiApplication::platformName().startsWith("wayland")) {
+    if (QGuiApplication::platformName().contains("wayland")) {
         return QSharedPointer<Maliit::AbstractPlatform>(new Maliit::WaylandPlatform);
     } else
 #endif
