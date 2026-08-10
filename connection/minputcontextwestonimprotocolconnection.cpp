@@ -1179,10 +1179,16 @@ void MInputContextWestonIMProtocolConnectionPrivate::processKeyEvent(uint32_t se
     if (isKeypadKey(sym))
         modifiers |= Qt::KeypadModifier;
 
+    // Hand the plugins the character the key actually produces, for every
+    // printable keysym rather than just the plain latin letters. Digits and
+    // punctuation used to arrive with an empty text, which left plugins no way
+    // to tell what was typed. Control characters (Return, Tab, Backspace,
+    // Escape, ...) keep an empty text so they stay recognisable as function
+    // keys.
     QString text("");
-    if ((XKB_KEY_A <= sym && sym <= XKB_KEY_Z) ||
-        (XKB_KEY_a <= sym && sym <= XKB_KEY_z)) {
-        text.append(QChar(sym));
+    const char32_t codepoint = xkb_keysym_to_utf32(sym);
+    if (codepoint >= 0x20 && codepoint != 0x7f) {
+        text = QString::fromUcs4(&codepoint, 1);
     }
 
 #ifdef HAS_LIBIM
