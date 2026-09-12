@@ -41,8 +41,12 @@ MKeyOverride::MKeyOverride(const QString &keyId)
 }
 
 MKeyOverride::MKeyOverride(const MKeyOverride &other)
-    // QObject has no copy constructor; naming it here says the base is
-    // default constructed on purpose, which is what -Wextra asks for.
+    // QObject has no copy constructor, so naming it here does not change what
+    // happens - but -Wextra asks for a copy constructor to say explicitly that
+    // its base is default constructed rather than leave it looking forgotten,
+    // and the compiler's opinion is the one that shows up in every build.
+    // clang-tidy disagrees; it loses.
+    // NOLINTNEXTLINE(readability-redundant-member-init)
     : QObject(),
       d_ptr(new MKeyOverridePrivate)
 {
