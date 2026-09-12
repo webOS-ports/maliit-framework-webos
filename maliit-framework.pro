@@ -38,6 +38,17 @@ contains(QT_MAJOR_VERSION, 4) {
     SUBDIRS += connection src passthroughserver
 }
 
+# LS2 identity for MaliitServer: the role, service, permission, api and groups
+# files under service/ describe this repo's own binary, so they live here
+# rather than in whichever component happens to supply the keyboard plugin.
+# webos-service.prf (qt-features-webos) substitutes the *.in files and installs
+# all five into the luna-service2 directories; the manifest is generated from
+# them at package time. SBINDIR and MALIIT_SERVER come from config.pri, which
+# is included at the top of this file, and match passthroughserver.pro's
+# target.path so the paths cannot drift apart.
+CONFIG += webos-service
+WEBOS_SYSBUS_DIR = service
+
 QMAKE_EXTRA_TARGETS += check-xml
 check-xml.target = check-xml
 check-xml.CONFIG = recursive
