@@ -10,6 +10,8 @@
  * of this file.
  */
 
+#include <climits>
+
 #include <QDebug>
 
 #include "msharedattributeextensionmanager.h"
@@ -51,11 +53,11 @@ void MSharedAttributeExtensionManager::registerPluginSetting(const QString &full
 
 void MSharedAttributeExtensionManager::handleClientDisconnect(unsigned int clientId)
 {
-    if (clientId > INT_MAX) {
-        qWarning() << "This conversion from uint to int may result in data lost, because the value exceeds INT_MAX. Before: " << clientId << ", After: " << INT_MAX;
+    if (clientId > static_cast<unsigned int>(INT_MAX)) {
+        qWarning() << "Client id does not fit into an int, ignoring. clientId:" << clientId;
         return;
     }
-    clientIds.removeOne(clientId);
+    clientIds.removeOne(static_cast<int>(clientId));
 }
 
 void MSharedAttributeExtensionManager::handleAttributeExtensionRegistered(unsigned int clientId, int id,
@@ -63,24 +65,32 @@ void MSharedAttributeExtensionManager::handleAttributeExtensionRegistered(unsign
 {
     Q_UNUSED(attributeExtension);
 
-    if (id != PluginSettings || clientId > INT_MAX) {
-        qWarning() << "This conversion from uint to int may result in data lost, because the value exceeds INT_MAX. Before: " << clientId << ", After: " << INT_MAX;
-        return;
-    }
-    if (clientIds.contains(clientId))
+    if (id != PluginSettings)
         return;
 
-    clientIds.append(clientId);
+    if (clientId > static_cast<unsigned int>(INT_MAX)) {
+        qWarning() << "Client id does not fit into an int, ignoring. clientId:" << clientId;
+        return;
+    }
+
+    const int client = static_cast<int>(clientId);
+    if (clientIds.contains(client))
+        return;
+
+    clientIds.append(client);
 }
 
 void MSharedAttributeExtensionManager::handleAttributeExtensionUnregistered(unsigned int clientId, int id)
 {
-    if (id != PluginSettings || clientId > INT_MAX) {
-        qWarning() << "This conversion from uint to int may result in data lost, because the value exceeds INT_MAX. Before: " << clientId << ", After: " << INT_MAX;
+    if (id != PluginSettings)
+        return;
+
+    if (clientId > static_cast<unsigned int>(INT_MAX)) {
+        qWarning() << "Client id does not fit into an int, ignoring. clientId:" << clientId;
         return;
     }
 
-    clientIds.removeOne(clientId);
+    clientIds.removeOne(static_cast<int>(clientId));
 }
 
 void MSharedAttributeExtensionManager::handleExtendedAttributeUpdate(unsigned int clientId, int id,
