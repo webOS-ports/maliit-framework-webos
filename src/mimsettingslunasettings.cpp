@@ -64,12 +64,10 @@ struct MImSettingsLunaSettingsBackendPrivate {
     {
         switch (group) {
         case MImSettings::GroupManager:
-            if (!g_managerSettingsList.contains(this))
-                g_managerSettingsList.append(this);
+            g_managerSettingsList.removeOne(this);
             break;
         case MImSettings::GroupPlugin:
-            if (g_pluginSettingsList.contains(this))
-                g_pluginSettingsList.removeOne(this);
+            g_pluginSettingsList.removeOne(this);
             break;
         }
     }
@@ -221,6 +219,7 @@ void MImSettingsLunaSettingsBackendFactory::subscribeSettings(const QString &key
 
     if (!ret) {
         qWarning() << "failed LSCall " << map->serviceUrl << ": " << error.message;
+        LSErrorFree(&error);
         return;
     }
 
@@ -235,7 +234,10 @@ void MImSettingsLunaSettingsBackendFactory::unsubscribeSettings(const QString &k
 
     if (m_subscriptionMap.contains(key) && m_subscriptionMap.value(key) != LSMESSAGE_TOKEN_INVALID) {
         token = (LSMessageToken)m_subscriptionMap.value(key);
-        LSCallCancel(m_handle, token, &error);
+        if (!LSCallCancel(m_handle, token, &error)) {
+            qWarning() << "failed to cancel subscription for " << key << ": " << error.message;
+            LSErrorFree(&error);
+        }
 
         m_subscriptionMap.insert(key, LSMESSAGE_TOKEN_INVALID);
     }
@@ -302,6 +304,7 @@ void MImSettingsLunaSettingsBackendFactory::registerService()
     ret = LSGmainAttach(m_handle, m_mainLoop, &error);
     if (!ret) {
         qCritical() << "Failed to attach service to main loop: " << error.message;
+        LSErrorFree(&error);
         exit(1);
     }
 
@@ -311,6 +314,7 @@ void MImSettingsLunaSettingsBackendFactory::registerService()
             ::serverConnectCallback, this, NULL, &error);
     if (!ret) {
         qCritical() << "Failed in calling palm://com.palm.lunabus/signal/registerServerStatus: " << error.message;
+        LSErrorFree(&error);
         exit(1);
     }
 }
@@ -323,7 +327,10 @@ void MImSettingsLunaSettingsBackendFactory::unregisterService()
 
         LSError error;
         LSErrorInit(&error);
-        LSUnregister(m_handle, &error);
+        if (!LSUnregister(m_handle, &error)) {
+            qWarning() << "failed to unregister service: " << error.message;
+            LSErrorFree(&error);
+        }
         m_handle = NULL;
     }
 }
