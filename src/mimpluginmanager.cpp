@@ -33,7 +33,6 @@
 
 #include <QDir>
 #include <QPluginLoader>
-#include <QSignalMapper>
 #include <QWeakPointer>
 #include <QCoreApplication>
 
@@ -895,16 +894,11 @@ void MIMPluginManagerPrivate::loadHandlerMap()
 {
     Q_Q(MIMPluginManager);
 
-    static QSignalMapper *signalMapper = 0;
-
-    // These variables should be reset whenever this method is called
-    if (signalMapper) {
-        qDeleteAll(handlerToPluginConfs);
-        handlerToPluginConfs.clear();
-        handlerToPlugin.clear();
-        delete signalMapper;
-    }
-    signalMapper = new QSignalMapper(q);
+    // These are rebuilt from scratch on every call. Deleting the settings
+    // objects drops their connections with them.
+    qDeleteAll(handlerToPluginConfs);
+    handlerToPluginConfs.clear();
+    handlerToPlugin.clear();
 
     // Queries all children under PluginRoot, each is a setting entry that maps an
     // input source to a plugin that handles it
@@ -921,10 +915,11 @@ void MIMPluginManagerPrivate::loadHandlerMap()
         handlerToPluginConfs.append(handlerItem);
         const QString &pluginName = handlerItem->value().toString();
         addHandlerMap(i.key(), pluginName);
-        QObject::connect(handlerItem, SIGNAL(valueChanged()), signalMapper, SLOT(map()));
-        signalMapper->setMapping(handlerItem, i.key());
+
+        const int state = i.key();
+        QObject::connect(handlerItem, &MImSettings::valueChanged,
+                         q, [this, state]() { _q_syncHandlerMap(state); });
     }
-    QObject::connect(signalMapper, SIGNAL(mapped(int)), q, SLOT(_q_syncHandlerMap(int)));
 }
 
 
