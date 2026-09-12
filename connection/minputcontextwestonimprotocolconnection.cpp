@@ -1176,8 +1176,12 @@ void MInputContextWestonIMProtocolConnectionPrivate::processKeyEvent(uint32_t se
 
     int keyCode = xkbKeyToQtKey(sym);
 
+    // Per-event, not folded into the member: the compositor only sends
+    // wl_keyboard.modifiers when a real modifier changes, so setting the bit
+    // on "modifiers" left it stuck on every subsequent key until then.
+    Qt::KeyboardModifiers eventModifiers = modifiers;
     if (isKeypadKey(sym))
-        modifiers |= Qt::KeypadModifier;
+        eventModifiers |= Qt::KeypadModifier;
 
     // Hand the plugins the character the key actually produces, for every
     // printable keysym rather than just the plain latin letters. Digits and
@@ -1195,18 +1199,18 @@ void MInputContextWestonIMProtocolConnectionPrivate::processKeyEvent(uint32_t se
     if (is_lgremote_numbersign(key)) {
         // # = shift + 3
         q->processKeyEvent(connection_id, keyType, Qt::Key_NumberSign,
-                modifiers | Qt::ShiftModifier, text,
+                eventModifiers | Qt::ShiftModifier, text,
                 false, 0, KEY_3 + EVDEV_OFFSET, 0, time);
     } else if (is_lgremote_asterisk(key)) {
         // * = shift + 8
         q->processKeyEvent(connection_id, keyType, Qt::Key_Asterisk,
-                modifiers | Qt::ShiftModifier, text,
+                eventModifiers | Qt::ShiftModifier, text,
                 false, 0, KEY_8 + EVDEV_OFFSET, 0, time);
     } else
 #endif
     {
         q->processKeyEvent(connection_id, keyType, static_cast<Qt::Key>(keyCode),
-                modifiers, text,
+                eventModifiers, text,
                 false, 0, key + EVDEV_OFFSET, 0, time);
     }
 }
