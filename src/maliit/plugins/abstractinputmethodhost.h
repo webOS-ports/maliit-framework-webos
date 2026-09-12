@@ -283,7 +283,7 @@ public Q_SLOTS:
      */
     virtual void setOrientationAngleLocked(bool lock) = 0;
 
-
+public:
     /*!
      * \brief Return information about loaded input method plugins which could work in specified \a state.
      *

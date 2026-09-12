@@ -63,7 +63,7 @@ private Q_SLOTS:
     void onVisibleChanged(bool visible);
     void updateInputMethodArea();
 
-
+private:
     bool containsWindow(QWindow *window);
 
     QSharedPointer<AbstractPlatform> m_platform;

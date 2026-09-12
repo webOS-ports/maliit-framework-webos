@@ -237,7 +237,7 @@ public:
 
     virtual void sendActivationLostEvent();
 
-// Inbound communication handlers
+public: // Inbound communication handlers
     //! ipc method provided to application, makes the application the active one
     void activateContext(unsigned int connectionId);
 
@@ -400,7 +400,7 @@ private:
      */
     WId winId();
 
-
+private:
     MInputContextConnectionPrivate *d;
     int lastOrientation;
 

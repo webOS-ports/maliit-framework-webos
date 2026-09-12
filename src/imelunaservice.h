@@ -47,7 +47,7 @@ protected Q_SLOTS:
 
     void onReset();
 
-
+protected:
     enum DeleteMode { BackspaceMode, DirectMode, MixedMode };
 
     void startService();

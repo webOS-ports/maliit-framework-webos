@@ -174,7 +174,7 @@ private Q_SLOTS:
                                   const QString &targetItem,
                                   const QString &attribute,
                                   const QVariant &value);
-
+private:
     QSet<MAbstractInputMethod *> targets();
 
 protected:

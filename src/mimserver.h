@@ -45,7 +45,7 @@ public:
         PersistentSettings
     };
 
-
+public:
     explicit MImServer(const QSharedPointer<MInputContextConnection> &icConnection,
                        const QSharedPointer<Maliit::AbstractPlatform> &platform,
                        QObject *parent = nullptr);

@@ -62,7 +62,7 @@ public:
         PersistentSettings
     };
 
-
+public:
     /*! Initializes a MImSettings to access the configuratin key denoted by
         \a key.  Key names are formatted like Unix filesystem paths (es.
         like "/myapp/settings/first").

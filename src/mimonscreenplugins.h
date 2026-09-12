@@ -72,11 +72,11 @@ private Q_SLOTS:
     void updateEnabledSubviews();
     void updateActiveSubview();
 
-
+private:
     void autoDetectActiveSubView();
     void autoDetectEnabledSubViews();
 
-
+private:
     QList<SubView> mAvailableSubViews;
     QList<SubView> mEnabledSubViews;
     QList<SubView> mLastEnabledSubViews;
