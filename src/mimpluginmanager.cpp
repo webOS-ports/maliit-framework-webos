@@ -89,6 +89,13 @@ MIMPluginManagerPrivate::MIMPluginManagerPrivate(const QSharedPointer<MInputCont
 MIMPluginManagerPrivate::~MIMPluginManagerPrivate()
 {
     qDeleteAll(handlerToPluginConfs);
+    handlerToPluginConfs.clear();
+
+    // Parentless, so nothing else is going to collect these.
+    delete localeInfo;
+    delete imAccessoryEnabledConf;
+    delete shutDownInterval;
+    delete isStaticService;
 }
 
 void MIMPluginManagerPrivate::loadPlugins(QStringList &pluginDirs)
@@ -246,22 +253,27 @@ bool MIMPluginManagerPrivate::unloadPlugin(Maliit::Plugins::InputMethodPlugin *p
     if (desc.inputMethod)
         delete desc.inputMethod;
 
-    if (desc.loader) {
-        if (!desc.loader->isLoaded()) {
-            qWarning() << "Requested plugin" << desc.loader->fileName() << "seems not loaded";
-            return false;
-        }
+    // The description is gone from the map, so this is the last reference to
+    // the loader: it has to be destroyed here whichever way we leave.
+    const QScopedPointer<QPluginLoader> loader(desc.loader);
 
-        qDebug() << "Unloading file" << desc.loader->fileName();
-
-        if (!desc.loader->unload()) {
-            qWarning() << "Failed to unload plugin" << desc.loader->fileName() << "with an error" << desc.loader->errorString();
-            return false;
-        }
-        qInfo() << "Plugin unloaded" << desc.pluginId << desc.loader->fileName();
-    } else {
+    if (!loader) {
         qWarning() << "Failed to find plugin loader" << desc.pluginId;
+        return true;
     }
+
+    if (!loader->isLoaded()) {
+        qWarning() << "Requested plugin" << loader->fileName() << "seems not loaded";
+        return false;
+    }
+
+    qDebug() << "Unloading file" << loader->fileName();
+
+    if (!loader->unload()) {
+        qWarning() << "Failed to unload plugin" << loader->fileName() << "with an error" << loader->errorString();
+        return false;
+    }
+    qInfo() << "Plugin unloaded" << desc.pluginId << loader->fileName();
 
     return true;
 }
