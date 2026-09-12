@@ -23,9 +23,7 @@
 #include <QDebug>
 
 #include <algorithm>
-#include <tr1/functional>
-
-using namespace std::tr1::placeholders;
+#include <iterator>
 
 namespace
 {
@@ -109,10 +107,11 @@ bool MImOnScreenPlugins::isEnabled(const QString &plugin) const
 
     std::remove_copy_if(mEnabledSubViews.begin(), mEnabledSubViews.end(),
                         std::back_inserter(mEnabledAndAvailableSubViews),
-                        std::tr1::bind(&MImOnScreenPlugins::isSubViewUnavailable, this, _1));
+                        [this](const SubView &subView) { return isSubViewUnavailable(subView); });
 
     return std::find_if(mEnabledAndAvailableSubViews.begin(), mEnabledAndAvailableSubViews.end(),
-                        std::tr1::bind(equalPlugin, _1, plugin)) != mEnabledAndAvailableSubViews.end();
+                        [&plugin](const SubView &subView) { return equalPlugin(subView, plugin); })
+           != mEnabledAndAvailableSubViews.end();
 }
 
 bool MImOnScreenPlugins::isSubViewEnabled(const SubView &subView) const
@@ -129,7 +128,8 @@ QList<MImOnScreenPlugins::SubView> MImOnScreenPlugins::enabledSubViews(const QSt
 {
     QList<MImOnScreenPlugins::SubView> result;
     std::remove_copy_if(mEnabledSubViews.begin(), mEnabledSubViews.end(),
-                        std::back_inserter(result), std::tr1::bind(notEqualPlugin, _1, plugin));
+                        std::back_inserter(result),
+                        [&plugin](const SubView &subView) { return notEqualPlugin(subView, plugin); });
     return result;
 }
 

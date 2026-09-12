@@ -31,12 +31,17 @@
 #include "windowgroup.h"
 #include "webosloginfo.h"
 
+#include <QCoreApplication>
 #include <QDir>
+#include <QFile>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QPluginLoader>
 #include <QWeakPointer>
-#include <QCoreApplication>
 
 #include <QDebug>
+#include <climits>
 #include <deque>
 
 namespace
@@ -1397,13 +1402,13 @@ void MIMPluginManager::updatePlugins()
     }
 
     if (!localeJson.isEmpty()) {
-        QString keyboardsLang = 0;
+        QString keyboardsLang;
         QJsonArray keyboardsArray = localeJson["keyboards"].toArray();
 
         qDebug() << "keyboards in localeInfo:" << keyboardsArray;
 
         if (!keyboardsArray.isEmpty()) {
-            for (ssize_t index = 0; index < keyboardsArray.size() ; ++index) {
+            for (qsizetype index = 0; index < keyboardsArray.size() ; ++index) {
                 if (!keyboardsArray[index].isNull()) {
                     keyboardsLang = keyboardsArray[index].toString();
                     webOSLogInfo("VKB_LANGUAGE", "keyboardLang", keyboardsLang);

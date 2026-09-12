@@ -17,6 +17,7 @@
 #include "minputcontextconnection.h"
 
 #include <QKeyEvent>
+#include <QMetaType>
 
 namespace {
     // attribute names for updateWidgetInformation() map
@@ -193,12 +194,12 @@ WId MInputContextConnection::winId()
 {
     QVariant winIdVariant = widgetState[WinId];
     // after transfer by dbus type can change
-    switch (winIdVariant.type()) {
-    case QVariant::UInt:
+    switch (winIdVariant.typeId()) {
+    case QMetaType::UInt:
         if (sizeof(uint) >= sizeof(WId))
             return winIdVariant.toUInt();
         break;
-    case QVariant::ULongLong:
+    case QMetaType::ULongLong:
         if (sizeof(qulonglong) >= sizeof(WId))
             return winIdVariant.toULongLong();
         break;
