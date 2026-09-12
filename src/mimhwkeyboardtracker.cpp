@@ -28,6 +28,12 @@
 
 /* bit array ops */
 #define BITS2BYTES(x) ((((x) - 1) / 8) + 1)
+/* The kernel copies evdev bitmaps out in sizeof(long) granularity (see
+ * bits_to_user() in drivers/input/evdev.c), so a buffer sized to the exact
+ * number of bytes the bits need is not enough: round it up to whole longs. */
+#define EVDEV_BITS_BUFSIZE(x) \
+    ((((BITS2BYTES(x)) + sizeof(long) - 1) / sizeof(long)) * sizeof(long))
+
 #define TEST_BIT(bit, array) (array[(bit) / 8] & (1 << (bit) % 8))
 
 MImHwKeyboardTrackerPrivate::MImHwKeyboardTrackerPrivate(MImHwKeyboardTracker *q_ptr) :
@@ -124,7 +130,7 @@ void MImHwKeyboardTrackerPrivate::evdevEvent()
 void MImHwKeyboardTrackerPrivate::tryEvdevDevice(const char *device)
 {
     QFile *qfile = new QFile(this);
-    unsigned char evbits[BITS2BYTES(EV_MAX)];
+    unsigned char evbits[EVDEV_BITS_BUFSIZE(EV_MAX)];
     int fd;
 
     qfile->setFileName(device);
@@ -150,7 +156,7 @@ void MImHwKeyboardTrackerPrivate::tryEvdevDevice(const char *device)
         return;
     }
 
-    unsigned char swbit[BITS2BYTES(EV_MAX)];
+    unsigned char swbit[EVDEV_BITS_BUFSIZE(EV_MAX)];
     if (ioctl(fd, EVIOCGBIT(EV_SW, SW_CNT), swbit) < 0) {
         delete qfile;
         return;
@@ -171,7 +177,7 @@ void MImHwKeyboardTrackerPrivate::tryEvdevDevice(const char *device)
     present = true;
 
     // Initialise initial tablet mode state
-    unsigned long state[BITS2BYTES(SW_MAX)];
+    unsigned char state[EVDEV_BITS_BUFSIZE(SW_MAX)];
     if (ioctl(fd, EVIOCGSW(SW_MAX), state) < 0)
         return;
 
