@@ -32,17 +32,24 @@ namespace
         if (!range_min.isValid() && !range_max.isValid())
             return true;
 
+        // canConvert<int>() answers "is there a conversion", not "does this
+        // value have one": every QString says yes and then converts to 0. A
+        // bound of "low" therefore used to read as a minimum of zero rather
+        // than as the malformed attribute it is. Ask for the conversion.
+        bool ok = false;
+        const int intValue = value.toInt(&ok);
+        if (!ok)
+            return false;
+
         if (range_min.isValid()) {
-            if (!range_min.canConvert<int>())
-                return false;
-            if (range_min.toInt() > value.toInt())
+            const int minimum = range_min.toInt(&ok);
+            if (!ok || minimum > intValue)
                 return false;
         }
 
         if (range_max.isValid()) {
-            if (!range_max.canConvert<int>())
-                return false;
-            if (range_max.toInt() < value.toInt())
+            const int maximum = range_max.toInt(&ok);
+            if (!ok || maximum < intValue)
                 return false;
         }
 
@@ -79,8 +86,14 @@ namespace
 
     bool checkIntList(const QVariant &value)
     {
-        if (!value.canConvert<QVariantList>())
+        // A scalar converts to an empty QVariantList rather than failing, so
+        // testing convertibility would accept, say, the string "1,2,3" as an
+        // int list that happens to have no elements - and every element check
+        // below would then pass vacuously. Require an actual list.
+        if (value.typeId() != QMetaType::QVariantList
+            && value.typeId() != QMetaType::QStringList) {
             return false;
+        }
 
         const QVariantList &values = value.toList();
 
