@@ -56,7 +56,7 @@ public:
     /*!
      * \brief Copy constructor
      */
-    MKeyOverride(const MKeyOverride&);
+    MKeyOverride(const MKeyOverride& /*other*/);
 
     /*!
     * \brief Destructor
@@ -85,7 +85,7 @@ public:
     //! Return true if the key is enabled; otherwise return false.
     bool enabled() const;
 
-public Q_SLOTS:
+
     //! Sets text for the key
     void setLabel(const QString &label);
 

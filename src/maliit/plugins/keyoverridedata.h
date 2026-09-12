@@ -58,7 +58,7 @@ public:
 
 protected:
 
-    typedef QMap<QString, QSharedPointer<MKeyOverride> > KeyOverrides;
+    using KeyOverrides = QMap<QString, QSharedPointer<MKeyOverride> >;
     KeyOverrides mKeyOverrides;
 
     friend class Ut_MKeyOverrideData;

@@ -21,9 +21,8 @@
 #include <maliit/namespaceinternal.h>
 
 MImUpdateEventPrivate::MImUpdateEventPrivate()
-    : update()
-    , changedProperties()
-    , lastHints(Qt::ImhNone)
+    : 
+     lastHints(Qt::ImhNone)
 {}
 
 MImUpdateEventPrivate::MImUpdateEventPrivate(const QMap<QString, QVariant> &newUpdate,
@@ -67,15 +66,15 @@ QVariant MImUpdateEventPrivate::extractProperty(const QString &key,
 }
 
 MImUpdateEvent::MImUpdateEvent(const QMap<QString, QVariant> &update,
-                               const QStringList &changedProperties)
-    : MImExtensionEvent(new MImUpdateEventPrivate(update, changedProperties, Qt::InputMethodHints()),
+                               const QStringList &propertiesChanged)
+    : MImExtensionEvent(new MImUpdateEventPrivate(update, propertiesChanged, Qt::InputMethodHints()),
                         MImExtensionEvent::Update)
 {}
 
 MImUpdateEvent::MImUpdateEvent(const QMap<QString, QVariant> &update,
-                               const QStringList &changedProperties,
+                               const QStringList &propertiesChanged,
                                const Qt::InputMethodHints &lastHints)
-    : MImExtensionEvent(new MImUpdateEventPrivate(update, changedProperties, lastHints),
+    : MImExtensionEvent(new MImUpdateEventPrivate(update, propertiesChanged, lastHints),
                         MImExtensionEvent::Update)
 {}
 

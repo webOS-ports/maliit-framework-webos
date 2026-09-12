@@ -17,7 +17,7 @@ namespace Maliit
 {
 
 WindowData::WindowData()
-    : m_window(),
+    : 
       m_position(Maliit::PositionCenterBottom)
 {}
 

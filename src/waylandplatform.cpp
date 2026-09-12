@@ -97,10 +97,10 @@ const wl_registry_listener maliit_registry_listener = {
 } // unnamed namespace
 
 WaylandPlatformPrivate::WaylandPlatformPrivate()
-    : m_registry(0),
-      m_panel(0),
-      m_panel_name(0),
-      m_scheduled_windows()
+    : m_registry(nullptr),
+      m_panel(nullptr),
+      m_panel_name(0)
+      
 {
     wl_display *display = static_cast<wl_display *>(QGuiApplication::platformNativeInterface()->nativeResourceForIntegration("display"));
     if (!display) {
@@ -116,7 +116,7 @@ WaylandPlatformPrivate::~WaylandPlatformPrivate()
 {
     if (m_panel) {
         input_panel_destroy (m_panel);
-        m_panel = NULL;
+        m_panel = nullptr;
     }
     if (m_registry) {
         wl_registry_destroy (m_registry);
@@ -146,7 +146,7 @@ void WaylandPlatformPrivate::handleRegistryGlobalRemove(uint32_t name)
     qDebug() << "Name:" << name;
     if (m_panel and m_panel_name == name) {
         input_panel_destroy(m_panel);
-        m_panel = 0;
+        m_panel = nullptr;
     }
 }
 
@@ -157,7 +157,7 @@ void WaylandPlatformPrivate::setupInputSurface(QWindow *window,
     if (!window)
         return;
 
-    struct wl_surface *surface = avoid_crash ? 0 : static_cast<struct wl_surface *>(QGuiApplication::platformNativeInterface()->nativeResourceForWindow("surface", window));
+    struct wl_surface *surface = avoid_crash ? nullptr : static_cast<struct wl_surface *>(QGuiApplication::platformNativeInterface()->nativeResourceForWindow("surface", window));
 
     if (not surface) {
         if (avoid_crash) {
@@ -187,9 +187,7 @@ WaylandPlatform::WaylandPlatform()
     : d_ptr(new WaylandPlatformPrivate)
 {}
 
-WaylandPlatform::~WaylandPlatform()
-{
-}
+WaylandPlatform::~WaylandPlatform() = default;
 
 void WaylandPlatform::setupInputPanel(QWindow* window,
                                       Maliit::Position position)
@@ -240,7 +238,7 @@ void WaylandPlatform::setInputRegion(QWindow* window,
         return;
     }
 
-    for (auto &rect: region) {
+    for (const auto &rect: region) {
         wl_region_add(wlregion, rect.x(), rect.y(),
                       rect.width(), rect.height());
     }

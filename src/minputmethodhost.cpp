@@ -29,10 +29,10 @@ MInputMethodHost::MInputMethodHost(const QSharedPointer<MInputContextConnection>
                                    const QSharedPointer<Maliit::WindowGroup> &windowGroup,
                                    const QString &plugin,
                                    const QString &description)
-    : MAbstractInputMethodHost(),
+    : 
       connection(inputContextConnection),
       pluginManager(pluginManager),
-      inputMethod(0),
+      inputMethod(nullptr),
       enabled(false),
       pluginId(plugin),
       pluginDescription(description),
@@ -42,10 +42,7 @@ MInputMethodHost::MInputMethodHost(const QSharedPointer<MInputContextConnection>
 }
 
 
-MInputMethodHost::~MInputMethodHost()
-{
-    // nothing
-}
+MInputMethodHost::~MInputMethodHost() = default;
 
 
 void MInputMethodHost::setEnabled(bool enabled)
@@ -251,7 +248,7 @@ void MInputMethodHost::setLanguage(const QString &language)
     }
 }
 
-void MInputMethodHost::setOrientationAngleLocked(bool)
+void MInputMethodHost::setOrientationAngleLocked(bool /*lock*/)
 {
     // NOT implemented.
 }

@@ -25,7 +25,7 @@ set -eu
 top_dir=$(cd "$(dirname "$0")/.." && pwd)
 cd "$top_dir"
 
-sources="common connection passthroughserver src"
+sources="common connection passthroughserver src tests"
 run_cppcheck=yes
 run_tidy=yes
 compile_commands=""
@@ -59,11 +59,27 @@ if [ "$run_cppcheck" = yes ] && command -v cppcheck >/dev/null 2>&1; then
     ran_any=yes
     echo "== cppcheck =="
 
-    # Qt's macros are opaque to cppcheck's preprocessor, and the generated moc
-    # output is not ours to fix, so both are suppressed rather than left to
-    # drown the real findings. Everything else is on.
+    # Everything cppcheck knows how to say, including the style category: the
+    # tree is expected to come out clean under it, so a finding here is a
+    # finding to fix rather than a category to switch off.
+    #
+    # The four suppressions below are about what cppcheck cannot see, not
+    # about what we would rather not hear:
+    #
+    #   missingInclude/missingIncludeSystem
+    #       it is not given the Qt, glib or luna-service2 include paths, by
+    #       design - resolving them would tie this script to a sysroot
+    #   unknownMacro
+    #       Q_OBJECT, Q_DECLARE_PRIVATE, Q_DISABLE_COPY and friends are moc
+    #       constructs its preprocessor does not model
+    #   unusedFunction
+    #       most of this tree is a library; "unused" here means "no caller in
+    #       this tree", which is true of every symbol a plugin links against
+    #
+    # Anything narrower is an inline cppcheck-suppress comment at the site,
+    # with the reason next to it.
     cppcheck \
-        --enable=warning,style,performance,portability \
+        --enable=all \
         --inconclusive \
         --std=c++17 \
         --language=c++ \
@@ -74,10 +90,9 @@ if [ "$run_cppcheck" = yes ] && command -v cppcheck >/dev/null 2>&1; then
         --suppress=missingInclude \
         --suppress=missingIncludeSystem \
         --suppress=unknownMacro \
-        --suppress=unmatchedSuppression \
         --suppress=unusedFunction \
-        --suppress=noExplicitConstructor \
-        --suppress=useStlAlgorithm \
+        --suppress=unmatchedSuppression \
+        --suppress=checkersReport \
         -I src -I common -I connection -I . \
         $sources || status=1
     echo
@@ -95,8 +110,14 @@ clang-tidy needs a compilation database and none was found.
 Generate one with bear (or intercept-build) against a normal build, then
 point this script at the directory holding compile_commands.json:
 
-    qmake CONFIG+=notests && bear -- make -j"$(nproc)"
-    scripts/static-analysis.sh --tidy-only --compile-commands .
+    mkdir build && cd build
+    qmake6 ../maliit-framework.pro CONFIG+=wayland CONFIG+=notests
+    bear -- make -j"$(nproc)"
+    cd .. && scripts/static-analysis.sh --tidy-only --compile-commands build
+
+For a cross build the database has to name the target sysroot, since that is
+where the Qt, glib and luna-service2 headers live; the include paths in the
+generated Makefiles under the OE build directory already do.
 
 Skipping clang-tidy.
 EOF

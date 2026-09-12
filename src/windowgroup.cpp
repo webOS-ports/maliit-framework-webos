@@ -29,8 +29,7 @@ WindowGroup::WindowGroup(const QSharedPointer<AbstractPlatform> &platform)
     connect(&m_hideTimer, SIGNAL(timeout()), this, SLOT(hideWindows()));
 }
 
-WindowGroup::~WindowGroup()
-{}
+WindowGroup::~WindowGroup() = default;
 
 void WindowGroup::activate()
 {
@@ -85,7 +84,7 @@ void WindowGroup::setupWindow(QWindow *window, Maliit::Position position)
 
 void WindowGroup::setScreenRegion(const QRegion &region, QWindow *window)
 {
-    if (window == 0 && m_window_list.size() > 0) {
+    if (window == nullptr && !m_window_list.empty()) {
         window = m_window_list.at(0).m_window.data();
     }
     m_platform->setInputRegion(window, region);
@@ -93,7 +92,7 @@ void WindowGroup::setScreenRegion(const QRegion &region, QWindow *window)
 
 void WindowGroup::setInputMethodArea(const QRegion &region, QWindow *window)
 {
-    if (window == 0 && m_window_list.size() > 0) {
+    if (window == nullptr && !m_window_list.empty()) {
         window = m_window_list.at(0).m_window.data();
     }
 

@@ -31,7 +31,7 @@ class MImSettingsQSettingsBackend : public MImSettingsBackend
     Q_OBJECT
 
 public:
-    explicit MImSettingsQSettingsBackend(QSettings *settingsInstance, const QString &key, QObject *parent = 0);
+    explicit MImSettingsQSettingsBackend(QSettings *settingsInstance, const QString &key, QObject *parent = nullptr);
     virtual ~MImSettingsQSettingsBackend();
 
     virtual QString key() const;

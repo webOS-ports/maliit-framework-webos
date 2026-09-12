@@ -45,7 +45,7 @@ class MInputMethodHost: public MAbstractInputMethodHost
 public:
     MInputMethodHost(const QSharedPointer<MInputContextConnection>& inputContextConnection,
                      MIMPluginManager *pluginManager,
-                     const QSharedPointer<Maliit::WindowGroup> &window_group, const QString &plugin,
+                     const QSharedPointer<Maliit::WindowGroup> &windowGroup, const QString &plugin,
                      const QString &description);
     virtual ~MInputMethodHost();
 
@@ -92,8 +92,8 @@ public:
 
     virtual void switchPlugin(Maliit::SwitchDirection direction);
     virtual void switchPlugin(const QString &pluginName);
-    virtual void setScreenRegion(const QRegion &region, QWindow *window = 0);
-    virtual void setInputMethodArea(const QRegion &region, QWindow *window = 0);
+    virtual void setScreenRegion(const QRegion &region, QWindow *window = nullptr);
+    virtual void setInputMethodArea(const QRegion &region, QWindow *window = nullptr);
     virtual void setSelection(int start, int length);
     virtual QList<MImPluginDescription> pluginDescriptions(Maliit::HandlerState state) const;
     virtual int preeditClickPos(bool &valid) const;

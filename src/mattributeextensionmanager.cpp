@@ -42,9 +42,7 @@ MAttributeExtensionManager::MAttributeExtensionManager()
 {
 }
 
-MAttributeExtensionManager::~MAttributeExtensionManager()
-{
-}
+MAttributeExtensionManager::~MAttributeExtensionManager() = default;
 
 QList<MAttributeExtensionId> MAttributeExtensionManager::attributeExtensionIdList() const
 {
@@ -78,15 +76,9 @@ void MAttributeExtensionManager::setCopyPasteState(bool copyAvailable, bool past
     if (copyPasteStatus == newStatus)
         return;
 
+    // Recorded only; the copy/paste button it used to drive is gone, so
+    // there is nothing to do per state.
     copyPasteStatus = newStatus;
-    switch (newStatus) {
-    case Maliit::InputMethodNoCopyPaste:
-        break;
-    case Maliit::InputMethodCopy:
-        break;
-    case Maliit::InputMethodPaste:
-        break;
-    }
 }
 
 void MAttributeExtensionManager::registerAttributeExtension(const MAttributeExtensionId &id, const QString &fileName)

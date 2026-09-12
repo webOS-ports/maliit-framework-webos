@@ -175,19 +175,15 @@ void MImHwKeyboardTrackerPrivate::tryEvdevDevice(const char *device)
     evdevTabletMode = TEST_BIT(SW_TABLET_MODE, state);
 }
 
-MImHwKeyboardTrackerPrivate::~MImHwKeyboardTrackerPrivate()
-{
-}
+MImHwKeyboardTrackerPrivate::~MImHwKeyboardTrackerPrivate() = default;
 
 MImHwKeyboardTracker::MImHwKeyboardTracker()
-    : QObject(),
+    : 
       d_ptr(new MImHwKeyboardTrackerPrivate(this))
 {
 }
 
-MImHwKeyboardTracker::~MImHwKeyboardTracker()
-{
-}
+MImHwKeyboardTracker::~MImHwKeyboardTracker() = default;
 
 bool MImHwKeyboardTracker::isPresent() const
 {

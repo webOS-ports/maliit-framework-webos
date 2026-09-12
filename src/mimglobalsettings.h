@@ -36,8 +36,8 @@ public:
         return &instance;
     }
 
-    MImGlobalSettings() {}
-    ~MImGlobalSettings() {}
+    MImGlobalSettings() = default;
+    ~MImGlobalSettings() = default;
 
     /*!
      * \brief Get instance ID.

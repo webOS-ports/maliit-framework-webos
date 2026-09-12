@@ -1,11 +1,35 @@
 # Checks worth failing a build over for this codebase.
 #
-# The selection is deliberately narrow: this is a long-lived Qt/C++ codebase
-# with house conventions that predate most modernize-* and readability-* advice,
-# so a broad selection would bury the findings that matter under thousands of
-# style notes. Everything enabled here points at a real defect class - a leak,
-# an out-of-range access, undefined behaviour, a sign error crossing a
-# boundary, or a resource that is not released on some path.
+# The tree is expected to come out clean under this file, so the rule for
+# adding a check is that its findings are ones we will fix, not ones we will
+# learn to scroll past. Two groups qualify:
+#
+#   1. defect classes - a leak, an out-of-range access, undefined behaviour, a
+#      sign error crossing a boundary, a resource not released on some path
+#   2. style, where the finding is mechanical and objective: a declaration and
+#      its definition disagreeing about a parameter name, a file-scope static
+#      that should be an unnamed namespace, 0 where nullptr is meant
+#
+# What is deliberately left off, and why - the counts are what an unfiltered
+# run reported against this tree, so the cost of turning one on is not
+# hypothetical:
+#
+#   misc-include-cleaner (724)
+#       would rewrite the include block of every file in the tree, and
+#       disagrees with Qt's own module headers
+#   misc-const-correctness (164)
+#       a large mechanical diff through code nobody is otherwise touching;
+#       worth doing, but as its own change, not as a gate
+#   cppcoreguidelines-* (~120)
+#       structurally incompatible with Qt: owning-memory and pro-type-member-init
+#       fight the d-pointer idiom, pro-bounds-* fights the C evdev and wayland
+#       APIs, pro-type-vararg fights qWarning and printf
+#   modernize-use-auto, modernize-loop-convert, modernize-pass-by-value,
+#   modernize-return-braced-init-list (~70)
+#       real style changes rather than mechanical ones, and against the house
+#       convention of naming the type
+#   misc-non-private-member-variables-in-classes (36)
+#       the *Private classes are plain aggregates on purpose
 #
 # Run through scripts/static-analysis.sh, which supplies the include paths.
 
@@ -65,17 +89,35 @@ Checks: >
   misc-static-assert,
   misc-unused-alias-decls,
   misc-unused-using-decls,
+  misc-use-anonymous-namespace,
+  modernize-deprecated-headers,
+  modernize-use-equals-default,
+  modernize-use-nullptr,
+  modernize-use-override,
+  modernize-use-using,
   performance-implicit-conversion-in-loop,
   performance-inefficient-algorithm,
   performance-inefficient-vector-operation,
   performance-move-const-arg,
   performance-no-automatic-move,
   performance-trivially-destructible,
+  performance-unnecessary-value-param,
+  readability-container-size-empty,
+  readability-delete-null-pointer,
+  readability-else-after-return,
+  readability-inconsistent-declaration-parameter-name,
   readability-misleading-indentation,
+  readability-named-parameter,
   readability-non-const-parameter,
+  readability-qualified-auto,
+  readability-redundant-access-specifiers,
   readability-redundant-control-flow,
+  readability-redundant-member-init,
   readability-redundant-smartptr-get,
   readability-redundant-string-cstr,
+  readability-simplify-boolean-expr,
+  readability-static-accessed-through-instance,
+  readability-static-definition-in-anonymous-namespace,
   readability-string-compare,
 
 # moc output is generated; findings in it are not actionable here.

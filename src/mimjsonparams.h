@@ -59,7 +59,7 @@ inline bool toInt(const QJsonValue &value, int min, int max, int *result)
 
     // Written as a positive test so NaN, which compares false against every
     // bound, is rejected rather than accepted by a negated one.
-    if (!(raw >= static_cast<double>(min) && raw <= static_cast<double>(max)))
+    if (raw < static_cast<double>(min) || raw > static_cast<double>(max))
         return false;
 
     *result = static_cast<int>(raw);

@@ -21,8 +21,8 @@
 #include <QSettings>
 
 
-typedef QList<MImSettingsQSettingsBackend *> Items;
-typedef QHash<QString, Items> ItemMap;
+using Items = QList<MImSettingsQSettingsBackend *>;
+using ItemMap = QHash<QString, Items>;
 
 namespace
 {
@@ -180,9 +180,7 @@ MImSettingsQSettingsBackendFactory::MImSettingsQSettingsBackendFactory(const QSt
     Q_UNUSED(application);
 }
 
-MImSettingsQSettingsBackendFactory::~MImSettingsQSettingsBackendFactory()
-{
-}
+MImSettingsQSettingsBackendFactory::~MImSettingsQSettingsBackendFactory() = default;
 
 MImSettingsBackend *MImSettingsQSettingsBackendFactory::create(const QString &key, const MImSettings::Group group, QObject *parent)
 {
@@ -193,7 +191,7 @@ MImSettingsBackend *MImSettingsQSettingsBackendFactory::create(const QString &ke
 
 /* QSettings backend backed by a temporary file */
 MImSettingsQSettingsTemporaryBackendFactory::MImSettingsQSettingsTemporaryBackendFactory()
-    : mTempFile()
+     
 {
     // Force backing file to be created, otherwise fileName() returns empty
     if (!mTempFile.open()) {
@@ -204,9 +202,7 @@ MImSettingsQSettingsTemporaryBackendFactory::MImSettingsQSettingsTemporaryBacken
     mSettings.reset(new QSettings(mTempFile.fileName(), QSettings::IniFormat));
 }
 
-MImSettingsQSettingsTemporaryBackendFactory::~MImSettingsQSettingsTemporaryBackendFactory()
-{
-}
+MImSettingsQSettingsTemporaryBackendFactory::~MImSettingsQSettingsTemporaryBackendFactory() = default;
 
 MImSettingsBackend *MImSettingsQSettingsTemporaryBackendFactory::create(const QString &key, const MImSettings::Group group, QObject *parent)
 {

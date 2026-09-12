@@ -13,6 +13,7 @@
 #include <climits>
 
 #include <QDebug>
+#include <utility>
 
 #include "msharedattributeextensionmanager.h"
 #include "mimsettings.h"
@@ -22,7 +23,7 @@ struct MSharedAttributeExtensionManagerPluginSetting
     MSharedAttributeExtensionManagerPluginSetting(const QString &key, Maliit::SettingEntryType type, QVariantMap attributes) :
         setting(key, MImSettings::GroupPlugin),
         type(type),
-        attributes(attributes)
+        attributes(std::move(attributes))
     {
     }
 
@@ -32,19 +33,15 @@ struct MSharedAttributeExtensionManagerPluginSetting
 };
 
 
-MSharedAttributeExtensionManager::MSharedAttributeExtensionManager()
-{
-}
+MSharedAttributeExtensionManager::MSharedAttributeExtensionManager() = default;
 
-MSharedAttributeExtensionManager::~MSharedAttributeExtensionManager()
-{
-}
+MSharedAttributeExtensionManager::~MSharedAttributeExtensionManager() = default;
 
 void MSharedAttributeExtensionManager::registerPluginSetting(const QString &fullName, Maliit::SettingEntryType type,
                                                              QVariantMap attributes)
 {
     QString key = fullName.section(QChar(1), -1);
-    QSharedPointer<MSharedAttributeExtensionManagerPluginSetting> value(new MSharedAttributeExtensionManagerPluginSetting(key, type, attributes));
+    QSharedPointer<MSharedAttributeExtensionManagerPluginSetting> value(new MSharedAttributeExtensionManagerPluginSetting(key, type, std::move(attributes)));
 
     sharedAttributeExtensions[key] = value;
 

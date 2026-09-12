@@ -42,7 +42,7 @@ class MInputContextConnection: public QObject
     Q_DISABLE_COPY(MInputContextConnection)
 
 public:
-    explicit MInputContextConnection(QObject *parent = 0);
+    explicit MInputContextConnection(QObject *parent = nullptr);
     virtual ~MInputContextConnection();
 
     virtual void setDisplayId(int /* displayId */) {}
@@ -134,13 +134,13 @@ public:
      * \param preeditFormats Selects visual stylings for each part of preedit
      * \param replacementStart The position at which characters are to be replaced relative
      *  from the start of the preedit string.
-     * \param replacementLength The number of characters to be replaced in the preedit string.
+     * \param replaceLength The number of characters to be replaced in the preedit string.
      * \param cursorPos The cursor position inside preedit
      */
     virtual void sendPreeditString(const QString &string,
                                    const QList<Maliit::PreeditTextFormat> &preeditFormats,
-                                   int replacementStart = 0,
-                                   int replacementLength = 0,
+                                   int replaceStart = 0,
+                                   int replaceLength = 0,
                                    int cursorPos = -1);
 
     /*!
@@ -204,7 +204,7 @@ public:
     /*!
      * \brief set global correction option enable/disable
      */
-    virtual void setGlobalCorrectionEnabled(bool);
+    virtual void setGlobalCorrectionEnabled(bool /*enabled*/);
 
     /*!
      *\brief Sets selection text start from \a start with \a length in the application widget.
@@ -237,45 +237,45 @@ public:
 
     virtual void sendActivationLostEvent();
 
-public: // Inbound communication handlers
+// Inbound communication handlers
     //! ipc method provided to application, makes the application the active one
     void activateContext(unsigned int connectionId);
 
     //! ipc method provided to the application, shows input method
-    void showInputMethod(unsigned int clientId);
+    void showInputMethod(unsigned int connectionId);
 
     //! ipc method provided to the application, hides input method
-    void hideInputMethod(unsigned int clientId);
+    void hideInputMethod(unsigned int connectionId);
 
     //! ipc method provided to the application, signals mouse click on preedit
-    void mouseClickedOnPreedit(unsigned int clientId,
+    void mouseClickedOnPreedit(unsigned int connectionId,
                                const QPoint &pos, const QRect &preeditRect);
 
     //! ipc method provided to the application, sets preedit
-    void setPreedit(unsigned int clientId, const QString &text, int cursorPos);
+    void setPreedit(unsigned int connectionId, const QString &text, int cursorPos);
 
-    void updateWidgetInformation(unsigned int clientId,
-                                 const QMap<QString, QVariant> &stateInformation,
-                                 bool focusChanged);
+    void updateWidgetInformation(unsigned int connectionId,
+                                 const QMap<QString, QVariant> &stateInfo,
+                                 bool handleFocusChange);
 
     //! ipc method provided to the application, resets the input method
-    void reset(unsigned int clientId);
+    void reset(unsigned int connectionId);
 
     /*!
      * \brief Target application is changing orientation
      */
-    void receivedAppOrientationAboutToChange(unsigned int clientId, int angle);
+    void receivedAppOrientationAboutToChange(unsigned int connectionId, int angle);
 
     /*!
      * \brief Target application changed orientation (already finished)
      */
-    void receivedAppOrientationChanged(unsigned int clientId, int angle);
+    void receivedAppOrientationChanged(unsigned int connectionId, int angle);
 
     /*! \brief Set copy/paste state for appropriate UI elements in the input method server
      *  \param copyAvailable bool TRUE if text is selected
      *  \param pasteAvailable bool TRUE if clipboard content is not empty
      */
-    void setCopyPasteState(unsigned int clientId,
+    void setCopyPasteState(unsigned int connectionId,
                            bool copyAvailable, bool pasteAvailable);
 
     /*!
@@ -283,7 +283,7 @@ public: // Inbound communication handlers
      *
      * This is called only if one has enabled redirection by calling \a setRedirectKeys.
      */
-    void processKeyEvent(unsigned int clientId, QEvent::Type keyType, Qt::Key keyCode,
+    void processKeyEvent(unsigned int connectionId, QEvent::Type keyType, Qt::Key keyCode,
                          Qt::KeyboardModifiers modifiers, const QString &text, bool autoRepeat,
                          int count, quint32 nativeScanCode, quint32 nativeModifiers, unsigned long time);
 
@@ -294,25 +294,27 @@ public: // Inbound communication handlers
      *  The \a id should be unique, and the \a fileName is the absolute file name of the
      *  attribute extension.
      */
-    void registerAttributeExtension(unsigned int clientId, int id, const QString &fileName);
+    void registerAttributeExtension(unsigned int connectionId, int id,
+                                    const QString &attributeExtension);
 
     /*!
      * \brief Unregister an input method attribute extension which unique identifier is \a id.
      */
-    void unregisterAttributeExtension(unsigned int clientId, int id);
+    void unregisterAttributeExtension(unsigned int connectionId, int id);
 
     /*!
      * \brief Sets the \a attribute for the \a target in the extended attribute which has unique \a id to \a value.
      */
-    void setExtendedAttribute(unsigned int clientId, int id, const QString &target,
-                              const QString &targetItem, const QString &attribute, const QVariant &value);
+    void setExtendedAttribute(unsigned int connectionId, int id, const QString &target,
+                              const QString &targetName, const QString &attribute,
+                              const QVariant &value);
 
     /*!
      * \brief Requests information about plugin/server settings.
      */
     void loadPluginSettings(int connectionId, const QString &descriptionLanguage);
 
-public Q_SLOTS:
+
     //! Update \a region covered by virtual keyboard
     virtual void updateInputMethodArea(const QRegion &region);
 
@@ -398,7 +400,7 @@ private:
      */
     WId winId();
 
-private:
+
     MInputContextConnectionPrivate *d;
     int lastOrientation;
 

@@ -35,14 +35,14 @@ void MKeyOverridePrivate::assign(const MKeyOverridePrivate &other)
 }
 
 MKeyOverride::MKeyOverride(const QString &keyId)
-    : QObject(),
+    : 
     d_ptr(new MKeyOverridePrivate)
 {
     d_ptr->keyId = keyId;
 }
 
 MKeyOverride::MKeyOverride(const MKeyOverride &other)
-    : QObject(),
+    : 
     d_ptr(new MKeyOverridePrivate)
 {
     *this = other;
@@ -55,6 +55,9 @@ MKeyOverride::~MKeyOverride()
 
 MKeyOverride &MKeyOverride::operator=(const MKeyOverride &other)
 {
+    if (this == &other)
+        return *this;
+
     Q_D(MKeyOverride);
 
     d->assign(*other.d_ptr);

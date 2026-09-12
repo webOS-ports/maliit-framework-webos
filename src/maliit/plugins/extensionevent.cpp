@@ -15,10 +15,15 @@
 #include <maliit/plugins/extensionevent.h>
 #include <maliit/plugins/extensionevent_p.h>
 
-MImExtensionEventPrivate::~MImExtensionEventPrivate()
-{}
+MImExtensionEventPrivate::~MImExtensionEventPrivate() = default;
 
+// cppcheck does not expand Q_DISABLE_COPY, which this class does use, so it
+// reports the copy constructor and assignment operator as missing. The
+// suppressions have to sit on the line above the initialiser list, which is
+// where it points.
 MImExtensionEvent::MImExtensionEvent(Type type)
+    // cppcheck-suppress noCopyConstructor
+    // cppcheck-suppress noOperatorEq
     : d_ptr(new MImExtensionEventPrivate)
 {
     d_ptr->type = type;
@@ -37,6 +42,9 @@ MImExtensionEvent::~MImExtensionEvent()
     delete d;
 }
 
+// The member access is inside Q_D, which cppcheck does not expand, so it
+// concludes the function touches no members and could be static.
+// cppcheck-suppress functionStatic
 MImExtensionEvent::Type MImExtensionEvent::type() const
 {
     Q_D(const MImExtensionEvent);

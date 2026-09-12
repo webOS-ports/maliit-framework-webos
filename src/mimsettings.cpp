@@ -25,7 +25,7 @@
 #include <QVariant>
 #include <QDebug>
 
-typedef MImSettingsLunaSettingsBackendFactory MImSettingsDefaultPersistentBackendFactory;
+using MImSettingsDefaultPersistentBackendFactory = MImSettingsLunaSettingsBackendFactory;
 
 QScopedPointer<MImSettingsBackendFactory> MImSettings::factory;
 MImSettings::SettingsType MImSettings::preferredSettingsType = MImSettings::InvalidSettings;
@@ -35,13 +35,9 @@ MImSettingsBackend::MImSettingsBackend(QObject *parent) :
 {
 }
 
-MImSettingsBackend::~MImSettingsBackend()
-{
-}
+MImSettingsBackend::~MImSettingsBackend() = default;
 
-MImSettingsBackendFactory::~MImSettingsBackendFactory()
-{
-}
+MImSettingsBackendFactory::~MImSettingsBackendFactory() = default;
 
 QString MImSettings::key() const
 {
@@ -86,7 +82,7 @@ MImSettings::MImSettings(const QString &key, const Group group, QObject *parent)
     : QObject(parent)
 {
     if (!factory) {
-        MImSettingsBackendFactory *newFactory = 0;
+        MImSettingsBackendFactory *newFactory = nullptr;
         switch (preferredSettingsType) {
 
         case TemporarySettings:
@@ -124,9 +120,7 @@ MImSettings::MImSettings(const QString &key, const Group group, QObject *parent)
     connect(backend.data(), SIGNAL(valueChanged()), this, SIGNAL(valueChanged()));
 }
 
-MImSettings::~MImSettings()
-{
-}
+MImSettings::~MImSettings() = default;
 
 void MImSettings::setPreferredSettingsType(SettingsType setting)
 {

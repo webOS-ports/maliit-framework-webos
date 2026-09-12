@@ -96,7 +96,7 @@ namespace
     }
 }
 
-bool validateSettingValue(Maliit::SettingEntryType type, const QVariantMap attributes, const QVariant &value)
+bool validateSettingValue(Maliit::SettingEntryType type, const QVariantMap& attributes, const QVariant &value)
 {
     QVariant domain = attributes[Maliit::SettingEntryAttributes::valueDomain];
     QVariant range_min = attributes[Maliit::SettingEntryAttributes::valueRangeMin];

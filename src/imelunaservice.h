@@ -47,12 +47,12 @@ protected Q_SLOTS:
 
     void onReset();
 
-protected:
+
     enum DeleteMode { BackspaceMode, DirectMode, MixedMode };
 
     void startService();
     void broadcastWidgetState();
-    void broadcastToSubscribers(QJsonObject response);
+    void broadcastToSubscribers(const QJsonObject& response);
     bool hasSubscribers() const;
 
     QJsonObject getWidgetStateJson() const;

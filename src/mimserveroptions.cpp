@@ -16,8 +16,8 @@
 
 #include "mimserveroptions.h"
 
-#include <stdio.h>
-#include <string.h>
+#include <cstdio>
+#include <cstring>
 
 #include <QtGlobal>
 #include <QDebug>
@@ -65,6 +65,8 @@ namespace {
     {
         MImServerOptionsParserBase(void *options);
 
+        // QSharedData has no virtual destructor of its own; this declares
+        // one, so the parsers can be deleted through a base pointer.
         virtual ~MImServerOptionsParserBase();
 
         //! Result of parameter parsing
@@ -99,11 +101,11 @@ namespace {
         void *serverOptions;
     };
 
-    typedef QExplicitlySharedDataPointer<MImServerOptionsParserBase> ParserBasePtr;
+    using ParserBasePtr = QExplicitlySharedDataPointer<MImServerOptionsParserBase>;
     QList<ParserBasePtr> parsers;
 
     //! Unregister parser associated with given \a options.
-    void unregisterParser(void *options)
+    void unregisterParser(const void *options)
     {
         QList<ParserBasePtr>::iterator iterator = parsers.begin();
         while (iterator != parsers.end()) {
@@ -118,13 +120,13 @@ namespace {
      //! \brief Parser of common command line parameters
     struct MImServerCommonOptionsParser : public MImServerOptionsParserBase
     {
-        MImServerCommonOptionsParser(MImServerCommonOptions *options);
+        explicit MImServerCommonOptionsParser(MImServerCommonOptions *options);
 
         //! \reimp
-        virtual ParsingResult parseParameter(const char * parameter,
-                                             const char * next,
-                                             int *argumentCount);
-        virtual void printAvailableOptions(const char *format);
+        ParsingResult parseParameter(const char * parameter,
+                                     const char * next,
+                                     int *argumentCount) override;
+        void printAvailableOptions(const char *format) override;
         //! \reimp_end
 
     private:
@@ -141,13 +143,13 @@ namespace {
          * when application will exit, so it is recommnded to create it in main().
          * \note It does not makes sense tp create more than one object of this class.
          */
-        MImServerConnectionOptionsParser(MImServerConnectionOptions *options);
+        explicit MImServerConnectionOptionsParser(MImServerConnectionOptions *options);
 
         //! \reimp
-        virtual ParsingResult parseParameter(const char * parameter,
-                                             const char * next,
-                                             int *argumentCount);
-        virtual void printAvailableOptions(const char *format);
+        ParsingResult parseParameter(const char * parameter,
+                                     const char * next,
+                                     int *argumentCount) override;
+        void printAvailableOptions(const char *format) override;
         //! \reimp_end
 
     private:
@@ -162,13 +164,13 @@ namespace {
 
     struct MImServerIgnoredOptionsParser : public MImServerOptionsParserBase
     {
-        MImServerIgnoredOptionsParser(MImServerIgnoredOptions *options);
+        explicit MImServerIgnoredOptionsParser(MImServerIgnoredOptions *options);
 
         //! \reimp
-        virtual ParsingResult parseParameter(const char * parameter,
-                                             const char * next,
-                                             int *argumentCount);
-        virtual void printAvailableOptions(const char *format);
+        ParsingResult parseParameter(const char * parameter,
+                                     const char * next,
+                                     int *argumentCount) override;
+        void printAvailableOptions(const char *format) override;
         //! \reimp_end
     };
 
@@ -187,9 +189,7 @@ MImServerOptionsParserBase::MImServerOptionsParserBase(void *options)
 {
 }
 
-MImServerOptionsParserBase::~MImServerOptionsParserBase()
-{
-}
+MImServerOptionsParserBase::~MImServerOptionsParserBase() = default;
 
 void* MImServerOptionsParserBase::options() const
 {
@@ -206,7 +206,7 @@ bool parseCommandLine(int argc, const char * const * argv)
 
     for (int n = 1; n < argc; ++n) {
         const char * const parameter = argv[n];
-        const char * const next = (n < argc - 1) ? argv[n + 1] : 0;
+        const char * const next = (n < argc - 1) ? argv[n + 1] : nullptr;
         MImServerOptionsParserBase::ParsingResult parsingResult = MImServerOptionsParserBase::Invalid;
 
         Q_FOREACH (const ParserBasePtr &base, parsers) {
@@ -259,7 +259,7 @@ MImServerIgnoredOptionsParser::MImServerIgnoredOptionsParser(MImServerIgnoredOpt
 
 MImServerOptionsParserBase::ParsingResult
 MImServerIgnoredOptionsParser::parseParameter(const char *parameter,
-                                              const char *,
+                                              const char * /*next*/,
                                               int *argumentCount)
 {
     const int count = sizeof(IgnoredParameters) / sizeof(IgnoredParameters[0]);
@@ -277,7 +277,7 @@ MImServerIgnoredOptionsParser::parseParameter(const char *parameter,
     return result;
 }
 
-void MImServerIgnoredOptionsParser::printAvailableOptions(const char *)
+void MImServerIgnoredOptionsParser::printAvailableOptions(const char * /*format*/)
 {
     // nothing to print
 }
@@ -303,7 +303,7 @@ MImServerCommonOptionsParser::MImServerCommonOptionsParser(MImServerCommonOption
 
 MImServerOptionsParserBase::ParsingResult
 MImServerCommonOptionsParser::parseParameter(const char *parameter,
-                                             const char *,
+                                             const char * /*next*/,
                                              int *argumentCount)
 {
     *argumentCount = 0;

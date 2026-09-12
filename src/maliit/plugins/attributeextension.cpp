@@ -20,12 +20,12 @@
 #include <QDebug>
 
 MAttributeExtensionPrivate::MAttributeExtensionPrivate()
-    : id()
-    , q_ptr(nullptr)
+    : 
+     q_ptr(nullptr)
 {
 }
 
-MAttributeExtension::MAttributeExtension(const MAttributeExtensionId &id, const QString &)
+MAttributeExtension::MAttributeExtension(const MAttributeExtensionId &id, const QString & /*unused*/)
     : d_ptr(new MAttributeExtensionPrivate())
 {
     Q_D(MAttributeExtension);

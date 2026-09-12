@@ -114,11 +114,12 @@ void Ut_EvdevBits::testBufsizeIsWholeLongs()
     QFETCH(int, bits);
 
     const size_t size = EVDEV_BITS_BUFSIZE(bits);
+    const size_t needed = static_cast<size_t>(BITS2BYTES(bits));
 
     QCOMPARE(size % sizeof(long), static_cast<size_t>(0));
-    QVERIFY(size >= BITS2BYTES(bits));
+    QVERIFY(size >= needed);
     // Never over-allocates by more than the rounding itself.
-    QVERIFY(size - BITS2BYTES(bits) < sizeof(long));
+    QVERIFY(size - needed < sizeof(long));
 }
 
 void Ut_EvdevBits::testBufferHoldsWhatTheKernelWrites_data()
@@ -144,7 +145,8 @@ void Ut_EvdevBits::testBufferHoldsWhatTheKernelWrites()
     QFETCH(int, ioctlLen);
 
     const size_t buffer = EVDEV_BITS_BUFSIZE(bufferBits);
-    const size_t written = kernelBytesCopied(ioctlMaxbit, ioctlLen);
+    const size_t written = kernelBytesCopied(static_cast<size_t>(ioctlMaxbit),
+                                             static_cast<size_t>(ioctlLen));
 
     QVERIFY2(written <= buffer,
              qPrintable(QString("kernel writes %1 bytes into a %2 byte buffer")
@@ -160,12 +162,12 @@ void Ut_EvdevBits::testTheRegressionCase()
     if (sizeof(long) == 8) {
         QCOMPARE(static_cast<size_t>(BITS2BYTES(EV_MAX)), static_cast<size_t>(4));
         QCOMPARE(kernelBytesCopied(EV_MAX, EV_MAX), static_cast<size_t>(8));
-        QVERIFY(kernelBytesCopied(EV_MAX, EV_MAX) > BITS2BYTES(EV_MAX));
+        QVERIFY(kernelBytesCopied(EV_MAX, EV_MAX) > static_cast<size_t>(BITS2BYTES(EV_MAX)));
     }
 
-    QVERIFY(kernelBytesCopied(EV_MAX, EV_MAX) <= EVDEV_BITS_BUFSIZE(EV_MAX));
-    QVERIFY(kernelBytesCopied(SW_CNT, SW_CNT) <= EVDEV_BITS_BUFSIZE(EV_MAX));
-    QVERIFY(kernelBytesCopied(SW_MAX, SW_MAX) <= EVDEV_BITS_BUFSIZE(SW_MAX));
+    QVERIFY(kernelBytesCopied(EV_MAX, EV_MAX) <= static_cast<size_t>(EVDEV_BITS_BUFSIZE(EV_MAX)));
+    QVERIFY(kernelBytesCopied(SW_CNT, SW_CNT) <= static_cast<size_t>(EVDEV_BITS_BUFSIZE(EV_MAX)));
+    QVERIFY(kernelBytesCopied(SW_MAX, SW_MAX) <= static_cast<size_t>(EVDEV_BITS_BUFSIZE(SW_MAX)));
 }
 
 void Ut_EvdevBits::testTestBit_data()

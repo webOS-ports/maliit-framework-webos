@@ -18,18 +18,9 @@
 class MAbstractInputMethodHostPrivate
 {
 public:
-    MAbstractInputMethodHostPrivate();
-    ~MAbstractInputMethodHostPrivate();
+    MAbstractInputMethodHostPrivate() = default;
+    ~MAbstractInputMethodHostPrivate() = default;
 };
-
-
-MAbstractInputMethodHostPrivate::MAbstractInputMethodHostPrivate()
-{
-}
-
-MAbstractInputMethodHostPrivate::~MAbstractInputMethodHostPrivate()
-{
-}
 
 
 MAbstractInputMethodHost::MAbstractInputMethodHost(QObject *parent)

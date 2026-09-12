@@ -8,17 +8,28 @@
 # recipe passes notests for target images, so nothing here reaches a device
 # unless it is asked for explicitly (see tests/README.md).
 
+# Two different anchors, and they are not interchangeable:
+#
+#   $$PWD    - this file's own directory, which is what qmake resolves an
+#              include() against. Used for the include() calls below.
+#   TOP_DIR  - relative to the *build* directory of the test being built,
+#              which is what the .pri files below expand LIBS, INCLUDEPATH and
+#              POST_TARGETDEPS against.
+#
+# Using TOP_DIR for the includes silently finds nothing: qmake reports an
+# unknown replace function and carries on, and the test then fails to link
+# against libraries it never learned about.
 TOP_DIR = ../..
 
-include($$TOP_DIR/config.pri)
+include($$PWD/../config.pri)
 
 TEMPLATE = app
 CONFIG -= app_bundle
 CONFIG += console
 QT += core gui testlib
 
-include($$TOP_DIR/src/libmaliit-plugins.pri)
-include($$TOP_DIR/common/libmaliit-common.pri)
+include($$PWD/../src/libmaliit-plugins.pri)
+include($$PWD/../common/libmaliit-common.pri)
 
 # The connection library itself is not linked: the only thing the tests take
 # from it is a header-only helper, and linking it would drag wayland and

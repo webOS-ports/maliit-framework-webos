@@ -60,7 +60,7 @@ struct XkbQtKey
     int qtkey;
 };
 
-static const struct XkbQtKey g_XkbQtKeyMap[] = {
+const struct XkbQtKey g_XkbQtKeyMap[] = {
     { XKB_KEY_Shift_L,     Qt::Key_Shift },
     { XKB_KEY_Control_L,   Qt::Key_Control },
     { XKB_KEY_Super_L,     Qt::Key_Super_L },
@@ -224,7 +224,7 @@ static const struct XkbQtKey g_XkbQtKeyMap[] = {
     { XKB_KEY_Cancel,      Qt::Key_MediaStop },
 };
 
-static const struct XkbQtKey g_XkbQtKeypadMap[] = {
+const struct XkbQtKey g_XkbQtKeypadMap[] = {
     { XKB_KEY_KP_Divide,   Qt::Key_Slash },
     { XKB_KEY_KP_Multiply, Qt::Key_Asterisk },
     { XKB_KEY_KP_Subtract, Qt::Key_Minus },
@@ -268,7 +268,7 @@ static const struct XkbQtKey g_XkbQtKeypadMap[] = {
     { Qt::Key_9,           Qt::Key_9 },
 };
 
-static const struct XkbQtKey g_XkbQtMediaMap[] = {
+const struct XkbQtKey g_XkbQtMediaMap[] = {
     { XKB_KEY_XF86AudioPlay, Qt::Key_MediaPlay },
     { Qt::Key_MediaPlay,     Qt::Key_MediaPlay },
     { XKB_KEY_XF86AudioStop, Qt::Key_MediaStop },
@@ -286,7 +286,7 @@ static const struct XkbQtKey g_XkbQtMediaMap[] = {
     { Qt::Key_AudioForward,     Qt::Key_AudioForward },
 };
 
-static xkb_keysym_t qtKeyToXkbKey(int qtkey)
+xkb_keysym_t qtKeyToXkbKey(int qtkey)
 {
     unsigned i;
 
@@ -306,7 +306,7 @@ static xkb_keysym_t qtKeyToXkbKey(int qtkey)
     return (xkb_keysym_t)qtkey;
 }
 
-static int xkbKeyToQtKey(xkb_keysym_t xkbkey)
+int xkbKeyToQtKey(xkb_keysym_t xkbkey)
 {
     unsigned i;
 
@@ -326,7 +326,7 @@ static int xkbKeyToQtKey(xkb_keysym_t xkbkey)
     return (int)xkbkey;
 }
 
-static bool isKeypadKey(xkb_keysym_t xkbkey)
+bool isKeypadKey(xkb_keysym_t xkbkey)
 {
     unsigned i;
     for (i = 0; i < sizeof(g_XkbQtKeypadMap) / sizeof(XkbQtKey); i++) {
@@ -773,15 +773,13 @@ bool matchesFlag(int value,
 
 MInputContextWestonIMProtocolConnectionPrivate::MInputContextWestonIMProtocolConnectionPrivate(MInputContextWestonIMProtocolConnection *connection)
     : q_ptr(connection),
-      display(0),
-      registry(0),
-      im(0),
-      im_context(0),
-      im_keyboard(0),
+      display(nullptr),
+      registry(nullptr),
+      im(nullptr),
+      im_context(nullptr),
+      im_keyboard(nullptr),
       im_serial(0),
-      selection(),
-      mods(),
-      state_info(),
+      
       m_displayId(-1)
 {
     display = static_cast<wl_display *>(QGuiApplication::platformNativeInterface()->nativeResourceForIntegration("display"));
@@ -801,11 +799,11 @@ void MInputContextWestonIMProtocolConnectionPrivate::releaseInputMethodContext()
     // The keyboard is grabbed through the context, so it has to go first.
     if (im_keyboard) {
         wl_keyboard_destroy(im_keyboard);
-        im_keyboard = NULL;
+        im_keyboard = nullptr;
     }
     if (im_context) {
         input_method_context_destroy(im_context);
-        im_context = NULL;
+        im_context = nullptr;
     }
 }
 
@@ -877,7 +875,9 @@ inputMethodKeyboardKeyMap(void *data,
     d->processKeyMap(format, fd, size);
 }
 
-static void
+namespace {
+
+void
 inputMethodKeyboardKey(void *data,
                        struct wl_keyboard *wl_keyboard,
                        uint32_t serial,
@@ -893,7 +893,7 @@ inputMethodKeyboardKey(void *data,
     d->processKeyEvent(serial, time, key, state_w);
 }
 
-static void
+void
 inputMethodKeyboardModifiers(void *data,
                        struct wl_keyboard *wl_keyboard,
                        uint32_t serial,
@@ -910,13 +910,15 @@ inputMethodKeyboardModifiers(void *data,
     d->processKeyModifiers(serial, mods_depressed, mods_latched, mods_locked, group);
 }
 
+} // namespace
+
 const wl_keyboard_listener input_method_keyboard_listener = {
     inputMethodKeyboardKeyMap,
-    NULL, /* enter */
-    NULL, /* leave */
+    nullptr, /* enter */
+    nullptr, /* leave */
     inputMethodKeyboardKey,
     inputMethodKeyboardModifiers,
-    NULL  /* repeat_info */
+    nullptr  /* repeat_info */
 };
 
 void MInputContextWestonIMProtocolConnectionPrivate::processKeyMap(uint32_t format, int fd, uint32_t size)
@@ -936,7 +938,7 @@ void MInputContextWestonIMProtocolConnectionPrivate::processKeyMap(uint32_t form
         return;
     }
 
-    char *keymapArea = static_cast<char*>(mmap(NULL, size, PROT_READ, MAP_SHARED, fd, 0));
+    char *keymapArea = static_cast<char*>(mmap(nullptr, size, PROT_READ, MAP_SHARED, fd, 0));
     if (keymapArea == MAP_FAILED) {
         close(fd);
         qWarning() << "failed to mmap() " << (unsigned long) size << " bytes\n";
@@ -1010,7 +1012,9 @@ static const struct RemoteKeysym g_RemoteKeysymMap[] = {
     { KEY_NUMERIC_9, XKB_KEY_9 },
 };
 
-static xkb_keysym_t get_remote_keysym(uint32_t key)
+namespace {
+
+xkb_keysym_t get_remote_keysym(uint32_t key)
 {
     for (unsigned i = 0; i < sizeof(g_RemoteKeysymMap) / sizeof(RemoteKeysym); i++) {
         if (key == g_RemoteKeysymMap[i].key)
@@ -1018,6 +1022,8 @@ static xkb_keysym_t get_remote_keysym(uint32_t key)
     }
     return XKB_KEY_NoSymbol;
 }
+
+} // namespace
 
 #ifdef HAS_LIBIM
 struct LGRemoteKey {
@@ -1433,9 +1439,7 @@ MInputContextWestonIMProtocolConnection::MInputContextWestonIMProtocolConnection
 {
 }
 
-MInputContextWestonIMProtocolConnection::~MInputContextWestonIMProtocolConnection()
-{
-}
+MInputContextWestonIMProtocolConnection::~MInputContextWestonIMProtocolConnection() = default;
 
 void MInputContextWestonIMProtocolConnection::setDisplayId(int displayId)
 {
@@ -1445,29 +1449,29 @@ void MInputContextWestonIMProtocolConnection::setDisplayId(int displayId)
 }
 
 void MInputContextWestonIMProtocolConnection::sendPreeditString(const QString &string,
-                                                                const QList<Maliit::PreeditTextFormat> &preedit_formats,
-                                                                int replace_start,
-                                                                int replace_length,
-                                                                int cursor_pos)
+                                                                const QList<Maliit::PreeditTextFormat> &preeditFormats,
+                                                                int replaceStart,
+                                                                int replaceLength,
+                                                                int cursorPos)
 {
     Q_D(MInputContextWestonIMProtocolConnection);
 
     qDebug() << "Preedit:" << string
-             << "replace start:" << replace_start
-             << "replace length:" << replace_length
-             << "cursor position:" << cursor_pos;
+             << "replace start:" << replaceStart
+             << "replace length:" << replaceLength
+             << "cursor position:" << cursorPos;
 
     if (d->im_context) {
-        MInputContextConnection::sendPreeditString(string, preedit_formats,
-                                                   replace_start, replace_length,
-                                                   cursor_pos);
+        MInputContextConnection::sendPreeditString(string, preeditFormats,
+                                                   replaceStart, replaceLength,
+                                                   cursorPos);
         const QByteArray raw(string.toUtf8());
 
-        if (replace_length > 0) {
+        if (replaceLength > 0) {
             input_method_context_delete_surrounding_text(d->im_context, d->im_serial,
-                                                         replace_start, replace_length);
+                                                         replaceStart, replaceLength);
         }
-        Q_FOREACH (const Maliit::PreeditTextFormat& format, preedit_formats) {
+        Q_FOREACH (const Maliit::PreeditTextFormat& format, preeditFormats) {
             if (format.start < 0 || format.length < 0) {
                 qWarning() << "Skipping preedit format with a negative range. start:" << format.start << "length:" << format.length;
                 continue;
@@ -1476,16 +1480,16 @@ void MInputContextWestonIMProtocolConnection::sendPreeditString(const QString &s
                                                  format.start, format.length,
                                                  face_to_uint (format.preeditFace));
         }
-        if (cursor_pos < 0) {
-            if (string.size() > INT_MAX + cursor_pos) {
-                qWarning() << "string.size() + cursor_pos value exceeds INT_MAX";
+        if (cursorPos < 0) {
+            if (string.size() > INT_MAX + cursorPos) {
+                qWarning() << "string.size() + cursorPos value exceeds INT_MAX";
                 return;
             }
-            cursor_pos = string.size() + 1 - cursor_pos;
+            cursorPos = string.size() + 1 - cursorPos;
         }
         input_method_context_preedit_cursor(d->im_context, d->im_serial,
                                             // convert from internal pos to byte pos
-                                            string.left(cursor_pos).toUtf8().size());
+                                            string.left(cursorPos).toUtf8().size());
         input_method_context_preedit_string(d->im_context, d->im_serial, raw.data(),
                                             raw.data());
     }
@@ -1562,35 +1566,32 @@ int MInputContextWestonIMProtocolConnection::anchorPosition(bool &valid)
 }
 
 void MInputContextWestonIMProtocolConnection::sendCommitString(const QString &string,
-                                                               int replace_start,
-                                                               int replace_length,
-                                                               int cursor_pos)
+                                                               int replaceStart,
+                                                               int replaceLength,
+                                                               int cursorPos)
 {
     Q_D(MInputContextWestonIMProtocolConnection);
 
     qDebug() << "commit:" << string
-             << "replace start:" << replace_start
-             << "replace length:" << replace_length
-             << "cursor position:" << cursor_pos;
+             << "replace start:" << replaceStart
+             << "replace length:" << replaceLength
+             << "cursor position:" << cursorPos;
 
     if (d->im_context) {
-        MInputContextConnection::sendCommitString(string, replace_start, replace_length, cursor_pos);
+        MInputContextConnection::sendCommitString(string, replaceStart, replaceLength, cursorPos);
         const QByteArray raw(string.toUtf8());
 
-        if (cursor_pos < 0) {
-            cursor_pos = string.size();
-        }
         input_method_context_preedit_string(d->im_context, d->im_serial, "", "");
         // NOTE: length is unsigned in wayland protocol
-        if (replace_length != 0) {
+        if (replaceLength != 0) {
             input_method_context_delete_surrounding_text(d->im_context, d->im_serial,
-                                                         replace_start, replace_length);
+                                                         replaceStart, replaceLength);
         }
-        const int pos = 0; // TODO (string.left(cursor_pos).toUtf8().size());
+        const int pos = 0; // TODO (string.left(cursorPos).toUtf8().size());
 
         input_method_context_cursor_position (d->im_context, d->im_serial, pos, pos);
         input_method_context_commit_string(d->im_context, d->im_serial, raw.data());
-                                           //string.left(cursor_pos).toUtf8().size());
+                                           //string.left(cursorPos).toUtf8().size());
     }
 }
 

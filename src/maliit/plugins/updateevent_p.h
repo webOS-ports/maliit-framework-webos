@@ -34,10 +34,10 @@ public:
                                    const Qt::InputMethodHints &newLastHints);
 
     bool isFlagSet(Qt::InputMethodHint hint,
-                   bool *changed = 0) const;
+                   bool *changed = nullptr) const;
 
     QVariant extractProperty(const QString &key,
-                             bool *changed = 0) const;
+                             bool *changed = nullptr) const;
 };
 
 #endif // MIMUPDATEEVENT_P_H

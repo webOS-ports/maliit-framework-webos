@@ -25,7 +25,7 @@ public:
     //! \param plugin Reference to loaded plugin.
     MImPluginDescriptionPrivate(const Maliit::Plugins::InputMethodPlugin &plugin);
 
-public:
+
     //! Plugin name.
     QString pluginName;
 
@@ -58,6 +58,9 @@ MImPluginDescription::~MImPluginDescription()
 
 MImPluginDescription &MImPluginDescription::operator=(const MImPluginDescription &other)
 {
+    if (this == &other)
+        return *this;
+
     *d_ptr = *other.d_ptr;
 
     return *this;

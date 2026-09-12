@@ -48,7 +48,7 @@ public:
      */
     void registerPluginSetting(const QString &fullName, Maliit::SettingEntryType type, QVariantMap attributes);
 
-public Q_SLOTS:
+
     void handleClientDisconnect(unsigned int clientId);
     void handleAttributeExtensionRegistered(unsigned int clientId, int id, const QString &attributeExtension);
     void handleAttributeExtensionUnregistered(unsigned int clientId, int id);
@@ -76,7 +76,7 @@ Q_SIGNALS:
 private:
     Q_SLOT void attributeValueChanged();
 
-    typedef QHash<QString, QSharedPointer<MSharedAttributeExtensionManagerPluginSetting> > SharedAttributeExtensionContainer;
+    using SharedAttributeExtensionContainer = QHash<QString, QSharedPointer<MSharedAttributeExtensionManagerPluginSetting> >;
     //! all registered attribute extensions
     SharedAttributeExtensionContainer sharedAttributeExtensions;
     QList<int> clientIds;

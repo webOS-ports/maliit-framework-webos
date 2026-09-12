@@ -45,21 +45,9 @@ namespace {
 class MInputContextConnectionPrivate
 {
 public:
-    MInputContextConnectionPrivate();
-    ~MInputContextConnectionPrivate();
+    MInputContextConnectionPrivate() = default;
+    ~MInputContextConnectionPrivate() = default;
 };
-
-
-MInputContextConnectionPrivate::MInputContextConnectionPrivate()
-{
-    // nothing
-}
-
-
-MInputContextConnectionPrivate::~MInputContextConnectionPrivate()
-{
-    // nothing
-}
 
 
 ////////////////////////
@@ -522,21 +510,21 @@ void MInputContextConnection::updateInputMethodArea(const QRegion &region)
     Q_UNUSED(region);
 }
 
-void MInputContextConnection::notifyExtendedAttributeChanged(int ,
-                                                             const QString &,
-                                                             const QString &,
-                                                             const QString &,
-                                                             const QVariant &)
+void MInputContextConnection::notifyExtendedAttributeChanged(int  /*unused*/,
+                                                             const QString & /*unused*/,
+                                                             const QString & /*unused*/,
+                                                             const QString & /*unused*/,
+                                                             const QVariant & /*unused*/)
 {
     // empty default implementation
 }
 
-void MInputContextConnection::notifyExtendedAttributeChanged(const QList<int> &,
-                                                             int ,
-                                                             const QString &,
-                                                             const QString &,
-                                                             const QString &,
-                                                             const QVariant &)
+void MInputContextConnection::notifyExtendedAttributeChanged(const QList<int> & /*unused*/,
+                                                             int  /*unused*/,
+                                                             const QString & /*unused*/,
+                                                             const QString & /*unused*/,
+                                                             const QString & /*unused*/,
+                                                             const QVariant & /*unused*/)
 {
     // empty default implementation
 }

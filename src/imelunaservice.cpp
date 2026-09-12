@@ -29,6 +29,7 @@
 const char *IMELunaService::SubscriberKey = "REMOTE_KEYBOARD_LIST";
 
 #include <QJsonObject>
+#include <utility>
 
 namespace {
 
@@ -119,9 +120,9 @@ protected:
 } // namespace
 
 IMELunaService::IMELunaService(QSharedPointer<MInputContextConnection> connection)
-    : m_connection(connection)
-    , m_mainLoop(NULL)
-    , m_handle(NULL)
+    : m_connection(std::move(connection))
+    , m_mainLoop(nullptr)
+    , m_handle(nullptr)
     , m_focusChangedSinceLastBroadcast(false)
     , m_broadcastTimer(new QTimer(this))
 {
@@ -140,12 +141,12 @@ IMELunaService::~IMELunaService()
         if (!LSUnregister(m_handle, err)) {
             qWarning() << "failed to unregister from the bus: " << err.message();
         }
-        m_handle = NULL;
+        m_handle = nullptr;
     }
 
     if (m_mainLoop) {
         g_main_loop_unref(m_mainLoop);
-        m_mainLoop = NULL;
+        m_mainLoop = nullptr;
     }
 }
 
@@ -154,7 +155,7 @@ bool IMELunaService::hasSubscribers() const
     return !m_clientByToken.isEmpty();
 }
 
-void IMELunaService::broadcastToSubscribers(QJsonObject response)
+void IMELunaService::broadcastToSubscribers(const QJsonObject& response)
 {
     LSErrorWrapper err;
     QJsonDocument document(response);
@@ -621,7 +622,7 @@ LSMethod IMELunaService::ime_bus_methods [] = {
     {"deleteCharacters", IMELunaService::handleDeleteCharacters, (LSMethodFlags) 0},
     {"sendEnterKey", IMELunaService::handleSendEnterKey, (LSMethodFlags) 0},
 
-    {0, 0, (LSMethodFlags) 0}
+    {nullptr, nullptr, (LSMethodFlags) 0}
 };
 
 void IMELunaService::startService()
@@ -644,7 +645,7 @@ void IMELunaService::startService()
         return;
     }
 
-    if (!LSRegisterCategory(m_handle, "/", ime_bus_methods, NULL, NULL, err)) {
+    if (!LSRegisterCategory(m_handle, "/", ime_bus_methods, nullptr, nullptr, err)) {
         qCritical() << "failed to register category on bus: " << err.message();
         return;
     }

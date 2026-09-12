@@ -66,21 +66,12 @@ void outputMessages(QtMsgType type,
     static const char *msgId = "default";
 
     QString funcName = QString("unknown");
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
     QStringList parser = QString(context.function).split(QChar('('), Qt::SkipEmptyParts);
     if (!parser.isEmpty()) {
         parser = parser.first().split(QChar(' '), Qt::SkipEmptyParts);
         if (!parser.isEmpty())
             funcName = parser.last();
     }
-#else
-    QStringList parser = QString(context.function).split(QChar('('), QString::SkipEmptyParts);
-    if (!parser.isEmpty()) {
-        parser = parser.first().split(QChar(' '), QString::SkipEmptyParts);
-        if (!parser.isEmpty())
-            funcName = parser.last();
-    }
-#endif
 
     switch (type) {
     case QtDebugMsg:
@@ -154,8 +145,9 @@ QSharedPointer<Maliit::AbstractPlatform> createPlatform()
 #ifdef HAVE_WAYLAND
     if (QGuiApplication::platformName().contains("wayland")) {
         return QSharedPointer<Maliit::AbstractPlatform>(new Maliit::WaylandPlatform);
-    } else
+    }
 #endif
+
     return QSharedPointer<Maliit::AbstractPlatform>(new Maliit::UnknownPlatform);
 }
 
@@ -177,7 +169,7 @@ int main(int argc, char **argv)
     if (serverCommonOptions.showHelp) {
         printHelpMessage();
         return 1;
-    } else if (not allRecognized) {
+    } if (not allRecognized) {
         printHelpMessage();
     }
 
@@ -207,7 +199,7 @@ int main(int argc, char **argv)
     int ret = 1;
 
     try {
-        ret = app.exec();
+        ret = QGuiApplication::exec();
     } catch (const std::bad_alloc &) {
         qCritical("There is not enough memory. bad_alloc exception catched");
         return 1;

@@ -23,7 +23,7 @@ class MAbstractInputMethodPrivate
 public:
     MAbstractInputMethodPrivate(MAbstractInputMethodHost *imHost,
                                 MAbstractInputMethod *parent);
-    ~MAbstractInputMethodPrivate();
+    ~MAbstractInputMethodPrivate() = default;
 
     MAbstractInputMethodHost *imHost;
 };
@@ -38,14 +38,10 @@ MAbstractInputMethodPrivate::MAbstractInputMethodPrivate(MAbstractInputMethodHos
 }
 
 
-MAbstractInputMethodPrivate::~MAbstractInputMethodPrivate()
-{
-}
-
 ///////////////
 
 MAbstractInputMethod::MAbstractInputMethod(MAbstractInputMethodHost *host)
-    : QObject(0), // MAbstractInputMethod is not deleted by mainWindow
+    : QObject(nullptr), // MAbstractInputMethod is not deleted by mainWindow
       d_ptr(new MAbstractInputMethodPrivate(host, this))
 {
 }
@@ -75,7 +71,7 @@ void MAbstractInputMethod::hide()
     // empty default implementation
 }
 
-void MAbstractInputMethod::setPreedit(const QString &, int)
+void MAbstractInputMethod::setPreedit(const QString & /*unused*/, int /*unused*/)
 {
     // empty default implementation
 }
