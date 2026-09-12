@@ -13,6 +13,7 @@
  */
 
 #include <cerrno> // for errno
+#include <climits> // for INT_MAX, UINT_MAX, USHRT_MAX
 #include <cstring> // for strerror
 #include <unistd.h> // for close
 #include <QGuiApplication>
@@ -437,7 +438,7 @@ struct MInputContextWestonIMProtocolConnectionPrivate
     void handleInputMethodContextMaxTextLength(uint32_t maxLength);
     void handleInputMethodContextPlatformData(const char *pattern);
 
-    void processKeyMap(uint32_t format, uint32_t fd, uint32_t size);
+    void processKeyMap(uint32_t format, int fd, uint32_t size);
     void processKeyEvent(uint32_t serial, uint32_t time, uint32_t key, uint32_t state);
     void processKeyModifiers(uint32_t serial, uint32_t mods_depressed, uint32_t
             mods_latched, uint32_t mods_locked, uint32_t group);
@@ -457,14 +458,14 @@ struct MInputContextWestonIMProtocolConnectionPrivate
         xkb_keymap *keymap = nullptr;
         xkb_state *state = nullptr;
 
-        xkb_mod_index_t shift_mod = 0;
-        xkb_mod_index_t caps_mod = 0;
-        xkb_mod_index_t ctrl_mod = 0;
-        xkb_mod_index_t alt_mod = 0;
-        xkb_mod_index_t mod2_mod = 0;
-        xkb_mod_index_t mod3_mod = 0;
-        xkb_mod_index_t super_mod = 0;
-        xkb_mod_index_t mod5_mod = 0;
+        xkb_mod_index_t shift_mod = XKB_MOD_INVALID;
+        xkb_mod_index_t caps_mod = XKB_MOD_INVALID;
+        xkb_mod_index_t ctrl_mod = XKB_MOD_INVALID;
+        xkb_mod_index_t alt_mod = XKB_MOD_INVALID;
+        xkb_mod_index_t mod2_mod = XKB_MOD_INVALID;
+        xkb_mod_index_t mod3_mod = XKB_MOD_INVALID;
+        xkb_mod_index_t super_mod = XKB_MOD_INVALID;
+        xkb_mod_index_t mod5_mod = XKB_MOD_INVALID;
         xkb_led_index_t num_led = 0;
         xkb_led_index_t caps_led = 0;
         xkb_led_index_t scroll_led = 0;
@@ -764,6 +765,17 @@ bool matchesFlag(int value,
     return ((value & flag) == flag);
 }
 
+// xkb_map_mod_get_index() returns XKB_MOD_INVALID (~0u) for a modifier the
+// keymap does not define; shifting by that - or by anything >= 32 - is
+// undefined behaviour, so the index has to be checked before it is used.
+bool modIsSet(uint32_t mods, xkb_mod_index_t mod)
+{
+    if (mod == XKB_MOD_INVALID || mod >= 32)
+        return false;
+
+    return (mods & (1u << mod)) != 0;
+}
+
 } // unnamed namespace
 
 MInputContextWestonIMProtocolConnectionPrivate::MInputContextWestonIMProtocolConnectionPrivate(MInputContextWestonIMProtocolConnection *connection)
@@ -852,10 +864,11 @@ inputMethodKeyboardKeyMap(void *data,
     MInputContextWestonIMProtocolConnectionPrivate *d =
         static_cast<MInputContextWestonIMProtocolConnectionPrivate *>(data);
 
-    if (fd < 0 || fd > USHRT_MAX) {
-        qWarning() << "This conversion from int to ushort may result in data lost, because the value exceeds USHRT_MAX. Before: " << fd << ", After: " << USHRT_MAX;
+    if (fd < 0) {
+        qWarning() << "Compositor sent an invalid keymap fd:" << fd;
         return;
     }
+    // processKeyMap() takes ownership of the fd and closes it on every path.
     d->processKeyMap(format, fd, size);
 }
 
@@ -901,52 +914,68 @@ const wl_keyboard_listener input_method_keyboard_listener = {
     NULL  /* repeat_info */
 };
 
-void MInputContextWestonIMProtocolConnectionPrivate::processKeyMap(uint32_t format, uint32_t fd, uint32_t size)
+void MInputContextWestonIMProtocolConnectionPrivate::processKeyMap(uint32_t format, int fd, uint32_t size)
 {
-    if (format == WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1) {
-        if ( fd > INT_MAX) {
-            qWarning() << "This conversion from uint to int may result in data lost, because the value exceeds INT_MAX. Before: " << fd << ", After: " << INT_MAX;
-            return;
-        }
-        char *keymapArea = static_cast<char*>(mmap(NULL, size, PROT_READ, MAP_SHARED, fd, 0));
-        if (keymapArea == NULL || keymapArea == MAP_FAILED) {
-            close(fd);
-            qWarning() << "failed to mmap() " << (unsigned long) size << " bytes\n";
-            return;
-        }
-
-        xkb_keymap *newKeymap = xkb_keymap_new_from_string(xkb.context,
-                keymapArea, XKB_KEYMAP_FORMAT_TEXT_V1,
-                XKB_MAP_COMPILE_PLACEHOLDER);
-
-        munmap(keymapArea, size);
+    // The fd is ours from here on: the wl_keyboard.keymap event hands the
+    // receiver a descriptor it is responsible for closing, whatever it then
+    // does with the contents.
+    if (format != WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1) {
+        qWarning() << "Ignoring keymap in unsupported format" << format;
         close(fd);
-
-        // free existing keymap
-        if (xkb.keymap) {
-            xkb_keymap_unref(xkb.keymap);
-        }
-        xkb.keymap = newKeymap;
-
-        if (xkb.state) {
-            xkb_state_unref(xkb.state);
-        }
-        xkb.state = xkb_state_new(xkb.keymap);
-
-        // set modifier index
-        xkb.shift_mod = xkb_map_mod_get_index(xkb.keymap, XKB_MOD_NAME_SHIFT);
-        xkb.caps_mod = xkb_map_mod_get_index(xkb.keymap, XKB_MOD_NAME_CAPS);
-        xkb.ctrl_mod = xkb_map_mod_get_index(xkb.keymap, XKB_MOD_NAME_CTRL);
-        xkb.alt_mod = xkb_map_mod_get_index(xkb.keymap, XKB_MOD_NAME_ALT);
-        xkb.mod2_mod = xkb_map_mod_get_index(xkb.keymap, "Mod2");
-        xkb.mod3_mod = xkb_map_mod_get_index(xkb.keymap, "Mod3");
-        xkb.super_mod = xkb_map_mod_get_index(xkb.keymap, XKB_MOD_NAME_LOGO);
-        xkb.mod5_mod = xkb_map_mod_get_index(xkb.keymap, "Mod5");
-
-        xkb.num_led = xkb_map_led_get_index(xkb.keymap, XKB_LED_NAME_NUM);
-        xkb.caps_led = xkb_map_led_get_index(xkb.keymap, XKB_LED_NAME_CAPS);
-        xkb.scroll_led = xkb_map_led_get_index(xkb.keymap, XKB_LED_NAME_SCROLL);
+        return;
     }
+
+    if (!xkb.context) {
+        qWarning() << "no xkb context, cannot use the keymap";
+        close(fd);
+        return;
+    }
+
+    char *keymapArea = static_cast<char*>(mmap(NULL, size, PROT_READ, MAP_SHARED, fd, 0));
+    if (keymapArea == MAP_FAILED) {
+        close(fd);
+        qWarning() << "failed to mmap() " << (unsigned long) size << " bytes\n";
+        return;
+    }
+
+    xkb_keymap *newKeymap = xkb_keymap_new_from_string(xkb.context,
+            keymapArea, XKB_KEYMAP_FORMAT_TEXT_V1,
+            XKB_MAP_COMPILE_PLACEHOLDER);
+
+    munmap(keymapArea, size);
+    close(fd);
+
+    if (!newKeymap) {
+        // Keep the keymap and state we already have rather than dropping
+        // to a null xkb_state that every key event would then dereference.
+        qWarning() << "failed to compile the keymap sent by the compositor";
+        return;
+    }
+
+    // free existing keymap
+    if (xkb.keymap) {
+        xkb_keymap_unref(xkb.keymap);
+    }
+    xkb.keymap = newKeymap;
+
+    if (xkb.state) {
+        xkb_state_unref(xkb.state);
+    }
+    xkb.state = xkb_state_new(xkb.keymap);
+
+    // set modifier index
+    xkb.shift_mod = xkb_map_mod_get_index(xkb.keymap, XKB_MOD_NAME_SHIFT);
+    xkb.caps_mod = xkb_map_mod_get_index(xkb.keymap, XKB_MOD_NAME_CAPS);
+    xkb.ctrl_mod = xkb_map_mod_get_index(xkb.keymap, XKB_MOD_NAME_CTRL);
+    xkb.alt_mod = xkb_map_mod_get_index(xkb.keymap, XKB_MOD_NAME_ALT);
+    xkb.mod2_mod = xkb_map_mod_get_index(xkb.keymap, "Mod2");
+    xkb.mod3_mod = xkb_map_mod_get_index(xkb.keymap, "Mod3");
+    xkb.super_mod = xkb_map_mod_get_index(xkb.keymap, XKB_MOD_NAME_LOGO);
+    xkb.mod5_mod = xkb_map_mod_get_index(xkb.keymap, "Mod5");
+
+    xkb.num_led = xkb_map_led_get_index(xkb.keymap, XKB_LED_NAME_NUM);
+    xkb.caps_led = xkb_map_led_get_index(xkb.keymap, XKB_LED_NAME_CAPS);
+    xkb.scroll_led = xkb_map_led_get_index(xkb.keymap, XKB_LED_NAME_SCROLL);
 }
 
 struct RemoteKeysym {
@@ -1116,11 +1145,14 @@ void MInputContextWestonIMProtocolConnectionPrivate::processKeyEvent(uint32_t se
         qWarning() << "Sum EVDEV_OFFSET and key value exceeds UINT_MAX. Before: " << key + EVDEV_OFFSET << ", After: " << UINT_MAX;
         return;
     }
-    int num_syms = xkb_key_get_syms(xkb.state, key + EVDEV_OFFSET, &syms);
 
     xkb_keysym_t sym = XKB_KEY_NoSymbol;
-    if (1 == num_syms)
-        sym = syms[0];
+    if (xkb.state) {
+        int num_syms = xkb_key_get_syms(xkb.state, key + EVDEV_OFFSET, &syms);
+
+        if (1 == num_syms)
+            sym = syms[0];
+    }
     // TODO: multiple key press?
 
     // Check keysym mapping for RC buttons
@@ -1164,14 +1196,16 @@ void MInputContextWestonIMProtocolConnectionPrivate::processKeyModifiers(uint32_
 
     uint32_t mods_lookup = mods_depressed | mods_latched;
     modifiers = Qt::NoModifier;
-    if (mods_lookup & (1 << xkb.ctrl_mod))
+    if (modIsSet(mods_lookup, xkb.ctrl_mod))
         modifiers |= Qt::ControlModifier;
-    if (mods_lookup & (1 << xkb.alt_mod))
+    if (modIsSet(mods_lookup, xkb.alt_mod))
         modifiers |= Qt::AltModifier;
-    if (mods_lookup & (1 << xkb.shift_mod))
+    if (modIsSet(mods_lookup, xkb.shift_mod))
         modifiers |= Qt::ShiftModifier;
 
-    xkb_state_update_mask(xkb.state, mods_depressed, mods_latched, mods_locked, 0, 0, group);
+    if (xkb.state) {
+        xkb_state_update_mask(xkb.state, mods_depressed, mods_latched, mods_locked, 0, 0, group);
+    }
 }
 
 void MInputContextWestonIMProtocolConnectionPrivate::handleInputMethodActivate(input_method_context *context,
