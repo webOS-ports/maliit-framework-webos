@@ -35,7 +35,7 @@ public:
     void detectEvdev();
     void tryEvdevDevice(const char *device);
 
-    QFile *evdevFile;
+    QFile *evdevFile = nullptr;
     int evdevTabletModePending;
     bool evdevTabletMode;
 

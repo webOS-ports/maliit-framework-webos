@@ -349,6 +349,8 @@ MImServerConnectionOptionsParser::parseParameter(const char *parameter,
     const int count = sizeof(AvailableConnectionParameters) / sizeof(AvailableConnectionParameters[0]);
     ParsingResult result = Invalid;
 
+    *argumentCount = 0;
+
     for (int i = 0; i < count; ++i) {
         const char * const availableParameter = AvailableConnectionParameters[i].name;
 

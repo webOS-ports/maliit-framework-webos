@@ -171,7 +171,11 @@ void MAttributeExtensionManager::setExtendedAttribute(const MAttributeExtensionI
         bool newKeyOverrideCreated = extension->keyOverrideData()->createKeyOverride(targetItem);
         QSharedPointer<MKeyOverride> keyOverride = extension->keyOverrideData()->keyOverride(targetItem);
 
-        Q_ASSERT(keyOverride);
+        if (!keyOverride) {
+            qWarning() << "No key override for" << targetItem;
+            return;
+        }
+
         const QByteArray byteArray = attribute.toLatin1();
         const char * const c_str = byteArray.data();
 

@@ -107,7 +107,15 @@ MImSettings::MImSettings(const QString &key, const Group group, QObject *parent)
 
         default:
             qCritical() << "Invalid value for preferredSettingType." << preferredSettingsType;
+            break;
         }
+
+        if (!newFactory) {
+            // Nothing below can work without a backend, and installing a null
+            // factory would only move the crash one line down.
+            qFatal("Could not create a settings backend factory.");
+        }
+
         MImSettings::setImplementationFactory(newFactory);
     }
 

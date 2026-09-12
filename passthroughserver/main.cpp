@@ -128,8 +128,9 @@ void outputMessages(QtMsgType type,
             return;
         break;
     case QtFatalMsg:
-        if (fprintf(stderr, "FATAL: %s\n", raw) < 0)
-            return;
+        // Report the failure if we can, but abort either way: returning from
+        // a QtFatalMsg handler is undefined.
+        (void) fprintf(stderr, "FATAL: %s\n", raw);
         abort();
     }
 }

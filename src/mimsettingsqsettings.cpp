@@ -54,6 +54,8 @@ struct MImSettingsQSettingsBackendPrivate {
     void unregisterInstance(MImSettingsQSettingsBackend *instance)
     {
         ItemMap::iterator items = registry.find(key);
+        if (items == registry.end())
+            return;
 
         items->removeOne(instance);
         if (items->isEmpty())
@@ -66,6 +68,8 @@ struct MImSettingsQSettingsBackendPrivate {
         // one slot deletes another MImSettings instance for this key
         QList<QPointer<MImSettingsQSettingsBackend> > items;
         ItemMap::iterator it = registry.find(key);
+        if (it == registry.end())
+            return;
 
         Q_FOREACH (MImSettingsQSettingsBackend *item, *it) {
             items.append(item);

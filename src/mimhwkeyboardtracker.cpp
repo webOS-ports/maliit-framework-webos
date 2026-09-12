@@ -70,10 +70,16 @@ void MImHwKeyboardTrackerPrivate::detectEvdev()
         const char *syspath = udev_list_entry_get_name(device);
         struct udev_device *udev_device =
             udev_device_new_from_syspath(udev, syspath);
-        const char *device = udev_device_get_devnode(udev_device);
 
-        if (device)
-            tryEvdevDevice(device);
+        if (!udev_device)
+            continue;
+
+        // Deliberately not named "device": that is the loop variable
+        // udev_list_entry_foreach() advances.
+        const char *devnode = udev_device_get_devnode(udev_device);
+
+        if (devnode)
+            tryEvdevDevice(devnode);
 
         udev_device_unref(udev_device);
         if (present)
@@ -89,13 +95,17 @@ void MImHwKeyboardTrackerPrivate::evdevEvent()
 
     struct input_event ev;
 
+    if (!evdevFile) {
+        return;
+    }
+
     qint64 len = evdevFile->read((char *) &ev, sizeof(ev));
     if (len < 0) {
-        qWarning() << "This conversion from long long to usinged long long may result in data lost. len:" << len;
+        qWarning() << "Failed to read from the evdev node:" << evdevFile->errorString();
         return;
     }
     if (len != sizeof(ev)) {
-        qWarning() << "Failed to read event:" << len;
+        qWarning() << "Short read from the evdev node, discarding" << len << "bytes";
         return;
     }
 
