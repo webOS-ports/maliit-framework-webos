@@ -45,8 +45,19 @@ The suite links against `libmaliit-plugins`, so it needs the framework's own
 dependencies (glib, luna-service2, libudev) but not a running LS2 bus: the
 settings tests select `MImSettings::TemporarySettings`, which is backed by a
 `QTemporaryFile`. To build it for a target, drop `CONFIG+=notests` from the
-recipe's `EXTRA_QMAKEVARS_PRE` and `make install`; the binaries land in
-`${MALIIT_TESTS_DIR}` (`/usr/opt/webos/tests/maliit-framework` by default).
+recipe's `EXTRA_QMAKEVARS_PRE`; the binaries land in `${MALIIT_TESTS_DIR}`
+(`/usr/opt/webos/tests/maliit-framework` by default).
+
+Note that this also needs somewhere for them to go in the recipe. Without it
+`do_package` stops with
+
+```
+QA Issue: Files/directories were installed but not shipped in any package
+```
+
+because the default `FILES` do not cover `${MALIIT_TESTS_DIR}`. Add a
+`-tests` package (or extend `FILES:${PN}-dev`) in the same change that turns
+the tests on.
 
 ## Sanitizers
 
