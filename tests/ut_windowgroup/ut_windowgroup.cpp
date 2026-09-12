@@ -183,9 +183,10 @@ void Ut_WindowGroup::testInputMethodAreaIsEmptyWhileHidden()
     group.activate();
     group.setInputMethodArea(QRegion(0, 0, 100, 50), window.data());
 
-    // The window was never shown, so there is no area to report.
-    Q_FOREACH (const QList<QVariant> &arguments, spy) {
-        QVERIFY(arguments.at(0).value<QRegion>().isEmpty());
+    // The window was never shown, so there is no area to report. QSignalSpy is
+    // not copyable, so index rather than iterate it.
+    for (int i = 0; i < spy.count(); ++i) {
+        QVERIFY(spy.at(i).at(0).value<QRegion>().isEmpty());
     }
 }
 
