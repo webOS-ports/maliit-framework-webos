@@ -30,6 +30,11 @@
 #       convention of naming the type
 #   misc-non-private-member-variables-in-classes (36)
 #       the *Private classes are plain aggregates on purpose
+#   readability-simplify-boolean-expr is enabled, but note that applying its
+#       fixes unattended is not safe around floating point: it will rewrite
+#       "!(x >= lo && x <= hi)" into "x < lo || x > hi", which is equivalent
+#       for every value except NaN - and NaN is usually exactly what such a
+#       test is there to catch. Read that one before taking it.
 #   readability-redundant-access-specifiers
 #       unsafe here, and not merely noisy. Q_SLOTS expands to nothing, so the
 #       "private:" that closes a "private Q_SLOTS:" section is redundant to

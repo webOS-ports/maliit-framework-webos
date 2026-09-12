@@ -16,6 +16,8 @@
 
 #include <QJsonValue>
 
+#include <cmath>
+
 //! \internal
 /*! \ingroup maliitserver
  * \brief Helpers for reading parameters out of a JSON payload that arrived
@@ -57,8 +59,17 @@ inline bool toInt(const QJsonValue &value, int min, int max, int *result)
 
     const double raw = value.toDouble();
 
-    // Written as a positive test so NaN, which compares false against every
-    // bound, is rejected rather than accepted by a negated one.
+    // NaN and the infinities have no int reading, and NaN in particular has to
+    // be excluded *before* the range test rather than by it: it compares false
+    // against every bound, so "raw < min || raw > max" lets it straight
+    // through. Writing that test the other way round - !(raw >= min && raw <=
+    // max) - does reject NaN, but the two forms look interchangeable and
+    // clang-tidy's readability-simplify-boolean-expr will happily rewrite one
+    // into the other. An explicit isfinite() says what is meant and survives
+    // the rewrite.
+    if (!std::isfinite(raw))
+        return false;
+
     if (raw < static_cast<double>(min) || raw > static_cast<double>(max))
         return false;
 
