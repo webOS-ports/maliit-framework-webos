@@ -11,13 +11,15 @@
 
 #include "maliit/settingdata.h"
 
+#include <QMetaType>
+
 namespace
 {
     bool checkValueDomain(const QVariant &value, const QVariant &domain)
     {
         if (!domain.isValid())
             return true;
-        if (!domain.canConvert(QVariant::List))
+        if (!domain.canConvert<QVariantList>())
             return false;
 
         QVariantList domain_values = domain.toList();
@@ -31,14 +33,14 @@ namespace
             return true;
 
         if (range_min.isValid()) {
-            if (!range_min.canConvert(QVariant::Int))
+            if (!range_min.canConvert<int>())
                 return false;
             if (range_min.toInt() > value.toInt())
                 return false;
         }
 
         if (range_max.isValid()) {
-            if (!range_max.canConvert(QVariant::Int))
+            if (!range_max.canConvert<int>())
                 return false;
             if (range_max.toInt() < value.toInt())
                 return false;
@@ -51,7 +53,7 @@ namespace
     {
         if (!domain.isValid())
             return true;
-        if (!domain.canConvert(QVariant::List))
+        if (!domain.canConvert<QVariantList>())
             return false;
 
         const QVariantList &domain_values = domain.toList();
@@ -86,7 +88,7 @@ namespace
         {
             QVariant copy = v;
 
-            if (!v.canConvert<int>() || !copy.convert(QVariant::Int))
+            if (!v.canConvert<int>() || !copy.convert(QMetaType::fromType<int>()))
                 return false;
         }
 
@@ -110,7 +112,7 @@ bool validateSettingValue(Maliit::SettingEntryType type, const QVariantMap attri
             return false;
         break;
     case Maliit::IntType:
-        if (!value.canConvert<int>() || !copy.convert(QVariant::Int))
+        if (!value.canConvert<int>() || !copy.convert(QMetaType::fromType<int>()))
             return false;
         if (!checkValueDomain(value, domain))
             return false;

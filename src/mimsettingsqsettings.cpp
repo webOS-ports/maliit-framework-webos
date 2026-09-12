@@ -16,8 +16,9 @@
 #include "mimsettingsqsettings.h"
 #include "config.h"
 
-#include <QSettings>
+#include <QDebug>
 #include <QPointer>
+#include <QSettings>
 
 
 typedef QList<MImSettingsQSettingsBackend *> Items;
@@ -195,7 +196,9 @@ MImSettingsQSettingsTemporaryBackendFactory::MImSettingsQSettingsTemporaryBacken
     : mTempFile()
 {
     // Force backing file to be created, otherwise fileName() returns empty
-    mTempFile.open();
+    if (!mTempFile.open()) {
+        qFatal("Could not create the temporary file backing the settings.");
+    }
     mTempFile.close();
 
     mSettings.reset(new QSettings(mTempFile.fileName(), QSettings::IniFormat));
