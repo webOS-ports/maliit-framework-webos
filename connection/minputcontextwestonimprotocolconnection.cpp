@@ -438,6 +438,8 @@ struct MInputContextWestonIMProtocolConnectionPrivate
     void handleInputMethodContextMaxTextLength(uint32_t maxLength);
     void handleInputMethodContextPlatformData(const char *pattern);
 
+    void releaseInputMethodContext();
+
     void processKeyMap(uint32_t format, int fd, uint32_t size);
     void processKeyEvent(uint32_t serial, uint32_t time, uint32_t key, uint32_t state);
     void processKeyModifiers(uint32_t serial, uint32_t mods_depressed, uint32_t
@@ -448,6 +450,7 @@ struct MInputContextWestonIMProtocolConnectionPrivate
     wl_registry *registry;
     input_method *im;
     input_method_context *im_context;
+    wl_keyboard *im_keyboard;
     uint32_t im_serial;
     QString selection;
     Modifiers mods;
@@ -784,6 +787,7 @@ MInputContextWestonIMProtocolConnectionPrivate::MInputContextWestonIMProtocolCon
       registry(0),
       im(0),
       im_context(0),
+      im_keyboard(0),
       im_serial(0),
       selection(),
       mods(),
@@ -802,11 +806,22 @@ MInputContextWestonIMProtocolConnectionPrivate::MInputContextWestonIMProtocolCon
     xkb.context = xkb_context_new(XKB_CONTEXT_NO_DEFAULT_INCLUDES);
 }
 
-MInputContextWestonIMProtocolConnectionPrivate::~MInputContextWestonIMProtocolConnectionPrivate()
+void MInputContextWestonIMProtocolConnectionPrivate::releaseInputMethodContext()
 {
+    // The keyboard is grabbed through the context, so it has to go first.
+    if (im_keyboard) {
+        wl_keyboard_destroy(im_keyboard);
+        im_keyboard = NULL;
+    }
     if (im_context) {
         input_method_context_destroy(im_context);
+        im_context = NULL;
     }
+}
+
+MInputContextWestonIMProtocolConnectionPrivate::~MInputContextWestonIMProtocolConnectionPrivate()
+{
+    releaseInputMethodContext();
     if (im) {
         input_method_destroy(im);
     }
@@ -1214,15 +1229,19 @@ void MInputContextWestonIMProtocolConnectionPrivate::handleInputMethodActivate(i
     Q_Q(MInputContextWestonIMProtocolConnection);
 
     qDebug() << "context:" << (long) context << "serial:" << serial;
-    if (im_context) {
-        input_method_context_destroy(im_context);
-    }
+    releaseInputMethodContext();
     im_context = context;
     im_serial = serial;
     input_method_context_add_listener(im_context, &maliit_input_method_context_listener, this);
 
-    wl_keyboard *keyboard = input_method_context_grab_keyboard(im_context);
-    wl_keyboard_add_listener(keyboard, &input_method_keyboard_listener, this);
+    // Held in im_keyboard so it is destroyed along with the context; without
+    // that every activate/deactivate cycle left a wl_keyboard proxy behind.
+    im_keyboard = input_method_context_grab_keyboard(im_context);
+    if (im_keyboard) {
+        wl_keyboard_add_listener(im_keyboard, &input_method_keyboard_listener, this);
+    } else {
+        qWarning() << "failed to grab the keyboard for this input method context";
+    }
 
     input_method_context_modifiers_map(im_context, mods.getModMap());
 
@@ -1265,8 +1284,7 @@ void MInputContextWestonIMProtocolConnectionPrivate::handleInputMethodDeactivate
     if (!im_context) {
         return;
     }
-    input_method_context_destroy(im_context);
-    im_context = NULL;
+    releaseInputMethodContext();
     state_info.clear();
     state_info[FocusStateAttribute] = false;
     q->updateWidgetInformation(connection_id, state_info, true);
@@ -1281,6 +1299,11 @@ void MInputContextWestonIMProtocolConnectionPrivate::handleInputMethodContextSur
     Q_Q(MInputContextWestonIMProtocolConnection);
 
     qDebug() << "text:" << text << "cursor:" << cursor << "anchor:" << anchor;
+
+    if (!text) {
+        qWarning() << "surrounding text event without any text";
+        return;
+    }
 
     unsigned long textlen = strlen(text);
     if (textlen > INT_MAX) {
@@ -1446,8 +1469,8 @@ void MInputContextWestonIMProtocolConnection::sendPreeditString(const QString &s
         }
         Q_FOREACH (const Maliit::PreeditTextFormat& format, preedit_formats) {
             if (format.start < 0 || format.length < 0) {
-                qWarning() << "This conversion from int to uint may result in data lost, because the value is less than 0. Before: " << format.start << ", " << format.length << ", After: " << 0;
-                return;
+                qWarning() << "Skipping preedit format with a negative range. start:" << format.start << "length:" << format.length;
+                continue;
             }
             input_method_context_preedit_styling(d->im_context, d->im_serial,
                                                  format.start, format.length,
