@@ -69,11 +69,23 @@ DIST_PATH = $$OUT_PWD/$$DIST_NAME
 TARBALL_SUFFIX = .tar.bz2
 TARBALL_PATH = $$DIST_PATH$$TARBALL_SUFFIX
 
-# The 'make dist' target
-# Creates a tarball
-QMAKE_EXTRA_TARGETS += dist
-dist.target = dist
-dist.commands += git archive HEAD --prefix=$$DIST_NAME/ | bzip2 > $$TARBALL_PATH;
-dist.commands += md5sum $$TARBALL_PATH | cut -d \' \' -f 1 > $$DIST_PATH\\.md5
+# The 'make dist-tarball' target
+# Creates a bzip2 tarball of HEAD, plus its md5.
+#
+# Not called 'dist': the subdirs template generates a 'dist' rule of its own
+# (tar of the distdir it assembles), and declaring a second recipe for the
+# same target made make warn on every single invocation -
+#
+#     Makefile:725: warning: overriding recipe for target 'dist'
+#     Makefile:656: warning: ignoring old recipe for target 'dist'
+#
+# and then use qmake's, because it is emitted last. So this recipe was never
+# the one that ran. Giving it its own name both silences the warning and
+# makes it reachable; 'make dist' keeps doing what it has actually been doing
+# all along.
+QMAKE_EXTRA_TARGETS += dist_tarball
+dist_tarball.target = dist-tarball
+dist_tarball.commands += git archive HEAD --prefix=$$DIST_NAME/ | bzip2 > $$TARBALL_PATH;
+dist_tarball.commands += md5sum $$TARBALL_PATH | cut -d \' \' -f 1 > $$DIST_PATH\\.md5
 
 OTHER_FILES += NEWS README INSTALL.local
