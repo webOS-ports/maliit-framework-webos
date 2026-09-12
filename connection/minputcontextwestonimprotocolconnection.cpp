@@ -1500,7 +1500,7 @@ bool MInputContextWestonIMProtocolConnection::hiddenText(bool &valid)
 int MInputContextWestonIMProtocolConnection::anchorPosition(bool &valid)
 {
     qDebug() << "valid:" << valid;
-    bool result = MInputContextConnection::anchorPosition(valid);
+    int result = MInputContextConnection::anchorPosition(valid);
     return result;
 }
 
