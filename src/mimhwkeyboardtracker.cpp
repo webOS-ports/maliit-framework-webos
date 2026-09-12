@@ -23,18 +23,9 @@
 #include <libudev.h>
 #include <linux/input.h>
 
+#include "mimevdevbits.h"
 #include "mimhwkeyboardtracker.h"
 #include "mimhwkeyboardtracker_p.h"
-
-/* bit array ops */
-#define BITS2BYTES(x) ((((x) - 1) / 8) + 1)
-/* The kernel copies evdev bitmaps out in sizeof(long) granularity (see
- * bits_to_user() in drivers/input/evdev.c), so a buffer sized to the exact
- * number of bytes the bits need is not enough: round it up to whole longs. */
-#define EVDEV_BITS_BUFSIZE(x) \
-    ((((BITS2BYTES(x)) + sizeof(long) - 1) / sizeof(long)) * sizeof(long))
-
-#define TEST_BIT(bit, array) (array[(bit) / 8] & (1 << (bit) % 8))
 
 MImHwKeyboardTrackerPrivate::MImHwKeyboardTrackerPrivate(MImHwKeyboardTracker *q_ptr) :
     evdevTabletModePending(-1),

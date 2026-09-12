@@ -21,6 +21,7 @@
 
 #include <QKeyEvent>
 #include "imelunaservice.h"
+#include "mimjsonparams.h"
 #include "minputcontextconnection.h"
 #include "luna-service2/lunaservice.h"
 #include "mimglobalsettings.h"
@@ -114,22 +115,6 @@ public:
 protected:
     LSMessage *m_message;
 };
-
-// JSON numbers are doubles; casting one straight to int is undefined as soon
-// as it does not fit. Returns false for anything outside [min, max] and for
-// NaN, which fails every comparison.
-bool intParameter(const QJsonValue &value, int min, int max, int *result)
-{
-    if (!value.isDouble())
-        return false;
-
-    const double raw = value.toDouble();
-    if (!(raw >= min && raw <= max))
-        return false;
-
-    *result = static_cast<int>(raw);
-    return true;
-}
 
 } // namespace
 
@@ -512,7 +497,7 @@ bool IMELunaService::handleInsertText(LSHandle *handle, LSMessage *message, void
     int length = -1;
 
     if (replaceLengthParam.isDouble()
-        && !intParameter(replaceLengthParam, INT_MIN, INT_MAX, &length)) {
+        && !Maliit::Json::toInt(replaceLengthParam, INT_MIN, INT_MAX, &length)) {
         msg.replyError("Invalid \"replaceLength\" parameter");
         return true;
     }
@@ -568,7 +553,7 @@ bool IMELunaService::handleDeleteCharacters(LSHandle *handle, LSMessage *message
     }
 
     int count = 0;
-    if (!intParameter(characterCount, 1, INT_MAX, &count)) {
+    if (!Maliit::Json::toInt(characterCount, 1, INT_MAX, &count)) {
         msg.replyError("Missing or invalid \"count\" parameter");
         return true;
     }

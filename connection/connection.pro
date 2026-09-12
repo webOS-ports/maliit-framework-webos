@@ -24,6 +24,7 @@ wayland {
     PUBLIC_SOURCES += \
         minputcontextwestonimprotocolconnection.cpp
     PUBLIC_HEADERS += \
+        mimxkbmodifiers.h \
         minputcontextwestonimprotocolconnection.h
 }
 

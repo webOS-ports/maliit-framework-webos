@@ -36,6 +36,13 @@ contains(QT_MAJOR_VERSION, 4) {
     error("Qt 5 is required. For the Qt 4 input context see maliit-inputcontext-qt4. For a Qt 4 Maliit please use the 0.81 or 0.94-qt4 branches/release series instead")
 } else {
     SUBDIRS += connection src passthroughserver
+
+    # The unit tests link against the libraries above, so they come last. They
+    # are skipped entirely for CONFIG+=notests, which is what target image
+    # builds pass; see tests/README.md for how to build and run them.
+    !notests {
+        SUBDIRS += tests
+    }
 }
 
 # LS2 identity for MaliitServer: the role, service, permission, api and groups

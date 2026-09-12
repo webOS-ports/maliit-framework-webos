@@ -32,6 +32,7 @@
 #include <sys/mman.h>
 #include <xkbcommon/xkbcommon.h>
 
+#include "mimxkbmodifiers.h"
 #include "minputcontextwestonimprotocolconnection.h"
 
 namespace {
@@ -768,17 +769,6 @@ bool matchesFlag(int value,
     return ((value & flag) == flag);
 }
 
-// xkb_map_mod_get_index() returns XKB_MOD_INVALID (~0u) for a modifier the
-// keymap does not define; shifting by that - or by anything >= 32 - is
-// undefined behaviour, so the index has to be checked before it is used.
-bool modIsSet(uint32_t mods, xkb_mod_index_t mod)
-{
-    if (mod == XKB_MOD_INVALID || mod >= 32)
-        return false;
-
-    return (mods & (1u << mod)) != 0;
-}
-
 } // unnamed namespace
 
 MInputContextWestonIMProtocolConnectionPrivate::MInputContextWestonIMProtocolConnectionPrivate(MInputContextWestonIMProtocolConnection *connection)
@@ -1221,11 +1211,11 @@ void MInputContextWestonIMProtocolConnectionPrivate::processKeyModifiers(uint32_
 
     uint32_t mods_lookup = mods_depressed | mods_latched;
     modifiers = Qt::NoModifier;
-    if (modIsSet(mods_lookup, xkb.ctrl_mod))
+    if (Maliit::xkbModifierIsSet(mods_lookup, xkb.ctrl_mod))
         modifiers |= Qt::ControlModifier;
-    if (modIsSet(mods_lookup, xkb.alt_mod))
+    if (Maliit::xkbModifierIsSet(mods_lookup, xkb.alt_mod))
         modifiers |= Qt::AltModifier;
-    if (modIsSet(mods_lookup, xkb.shift_mod))
+    if (Maliit::xkbModifierIsSet(mods_lookup, xkb.shift_mod))
         modifiers |= Qt::ShiftModifier;
 
     if (xkb.state) {

@@ -42,6 +42,13 @@ isEmpty(MALIIT_DATA_DIR) {
     MALIIT_DATA_DIR = $$DATADIR/maliit
 }
 
+# Where "make install" puts the unit tests when they are built at all. They are
+# off by default for target images (the recipe passes CONFIG+=notests); see
+# tests/README.md.
+isEmpty(MALIIT_TESTS_DIR) {
+    MALIIT_TESTS_DIR = $$PREFIX/opt/webos/tests/$$MALIIT_PACKAGENAME
+}
+
 isEmpty(MALIIT_PLUGINS_DIR) {
     MALIIT_PLUGINS_DIR = $$LIBDIR/$$MALIIT_PLUGINS
 }
