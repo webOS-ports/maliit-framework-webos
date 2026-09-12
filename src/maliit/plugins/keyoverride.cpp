@@ -35,15 +35,16 @@ void MKeyOverridePrivate::assign(const MKeyOverridePrivate &other)
 }
 
 MKeyOverride::MKeyOverride(const QString &keyId)
-    : 
-    d_ptr(new MKeyOverridePrivate)
+    : d_ptr(new MKeyOverridePrivate)
 {
     d_ptr->keyId = keyId;
 }
 
 MKeyOverride::MKeyOverride(const MKeyOverride &other)
-    : 
-    d_ptr(new MKeyOverridePrivate)
+    // QObject has no copy constructor; naming it here says the base is
+    // default constructed on purpose, which is what -Wextra asks for.
+    : QObject(),
+      d_ptr(new MKeyOverridePrivate)
 {
     *this = other;
 }

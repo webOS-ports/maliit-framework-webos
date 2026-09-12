@@ -20,8 +20,7 @@
 #include <QDebug>
 
 MAttributeExtensionPrivate::MAttributeExtensionPrivate()
-    : 
-     q_ptr(nullptr)
+    : q_ptr(nullptr)
 {
 }
 

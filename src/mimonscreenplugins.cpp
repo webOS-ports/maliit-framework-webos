@@ -62,7 +62,7 @@ namespace
 }
 
 MImOnScreenPlugins::SubView::SubView()
-     
+
 = default;
 
 MImOnScreenPlugins::SubView::SubView(const QString &new_plugin,
@@ -78,7 +78,7 @@ bool MImOnScreenPlugins::SubView::operator==(const MImOnScreenPlugins::SubView &
 }
 
 MImOnScreenPlugins::MImOnScreenPlugins():
-    
+
     mEnabledSubViewsSettings(EnabledSubViews),
     mActiveSubViewSettings(ActiveSubView),
     mAllSubviewsEnabled(false)

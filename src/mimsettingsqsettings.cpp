@@ -191,7 +191,7 @@ MImSettingsBackend *MImSettingsQSettingsBackendFactory::create(const QString &ke
 
 /* QSettings backend backed by a temporary file */
 MImSettingsQSettingsTemporaryBackendFactory::MImSettingsQSettingsTemporaryBackendFactory()
-     
+
 {
     // Force backing file to be created, otherwise fileName() returns empty
     if (!mTempFile.open()) {

@@ -100,7 +100,7 @@ WaylandPlatformPrivate::WaylandPlatformPrivate()
     : m_registry(nullptr),
       m_panel(nullptr),
       m_panel_name(0)
-      
+
 {
     wl_display *display = static_cast<wl_display *>(QGuiApplication::platformNativeInterface()->nativeResourceForIntegration("display"));
     if (!display) {

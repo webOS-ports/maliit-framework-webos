@@ -779,7 +779,7 @@ MInputContextWestonIMProtocolConnectionPrivate::MInputContextWestonIMProtocolCon
       im_context(nullptr),
       im_keyboard(nullptr),
       im_serial(0),
-      
+
       m_displayId(-1)
 {
     display = static_cast<wl_display *>(QGuiApplication::platformNativeInterface()->nativeResourceForIntegration("display"));

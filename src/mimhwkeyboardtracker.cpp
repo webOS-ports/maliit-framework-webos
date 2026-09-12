@@ -178,8 +178,7 @@ void MImHwKeyboardTrackerPrivate::tryEvdevDevice(const char *device)
 MImHwKeyboardTrackerPrivate::~MImHwKeyboardTrackerPrivate() = default;
 
 MImHwKeyboardTracker::MImHwKeyboardTracker()
-    : 
-      d_ptr(new MImHwKeyboardTrackerPrivate(this))
+    : d_ptr(new MImHwKeyboardTrackerPrivate(this))
 {
 }
 

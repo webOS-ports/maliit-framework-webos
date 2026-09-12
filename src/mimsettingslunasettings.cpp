@@ -284,7 +284,7 @@ bool MImSettingsLunaSettingsBackendFactory::serverConnectCallback(LSHandle *hand
         unsubscribeAll();
         return false;
     }         restoreSubscriptions();
-   
+
 
     return true;
 }
@@ -340,7 +340,7 @@ void MImSettingsLunaSettingsBackendFactory::unregisterService()
 }
 
 MImSettingsLunaSettingsBackendFactory::MImSettingsLunaSettingsBackendFactory()
-     
+
 {
     m_mainCtx = g_main_context_default();
     m_mainLoop = g_main_loop_new(m_mainCtx, TRUE);

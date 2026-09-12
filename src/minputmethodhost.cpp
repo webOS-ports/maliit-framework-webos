@@ -29,8 +29,7 @@ MInputMethodHost::MInputMethodHost(const QSharedPointer<MInputContextConnection>
                                    const QSharedPointer<Maliit::WindowGroup> &windowGroup,
                                    const QString &plugin,
                                    const QString &description)
-    : 
-      connection(inputContextConnection),
+    : connection(inputContextConnection),
       pluginManager(pluginManager),
       inputMethod(nullptr),
       enabled(false),

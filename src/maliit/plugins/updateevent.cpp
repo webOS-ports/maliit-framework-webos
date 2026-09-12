@@ -21,8 +21,7 @@
 #include <maliit/namespaceinternal.h>
 
 MImUpdateEventPrivate::MImUpdateEventPrivate()
-    : 
-     lastHints(Qt::ImhNone)
+    : lastHints(Qt::ImhNone)
 {}
 
 MImUpdateEventPrivate::MImUpdateEventPrivate(const QMap<QString, QVariant> &newUpdate,

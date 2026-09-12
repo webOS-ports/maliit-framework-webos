@@ -79,7 +79,7 @@ MIMPluginManagerPrivate::MIMPluginManagerPrivate(const QSharedPointer<MInputCont
       adaptor(nullptr),
       q_ptr(nullptr),
       visible(false),
-      
+
       lastOrientation(0),
       attributeExtensionManager(new MAttributeExtensionManager),
       sharedAttributeExtensionManager(new MSharedAttributeExtensionManager),
@@ -253,9 +253,9 @@ bool MIMPluginManagerPrivate::unloadPlugin(Maliit::Plugins::InputMethodPlugin *p
 
     plugins.remove(plugin);
     desc.windowGroup.clear();
-    
+
         delete desc.imHost;
-    
+
         delete desc.inputMethod;
 
     // The description is gone from the map, so this is the last reference to
@@ -1198,8 +1198,7 @@ void MIMPluginManagerPrivate::setActivePlugin(const QString &pluginId,
 
 MIMPluginManager::MIMPluginManager(const QSharedPointer<MInputContextConnection>& icConnection,
                                    const QSharedPointer<Maliit::AbstractPlatform> &platform)
-    : 
-      d_ptr(new MIMPluginManagerPrivate(icConnection, platform, this))
+    : d_ptr(new MIMPluginManagerPrivate(icConnection, platform, this))
 {
     Q_D(MIMPluginManager);
 

@@ -17,8 +17,7 @@ namespace Maliit
 {
 
 WindowData::WindowData()
-    : 
-      m_position(Maliit::PositionCenterBottom)
+    : m_position(Maliit::PositionCenterBottom)
 {}
 
 WindowData::WindowData(QWindow *window, Maliit::Position position)
