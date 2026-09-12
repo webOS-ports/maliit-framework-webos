@@ -95,6 +95,7 @@ public:
                               const QString &attribute,
                               const QVariant &value);
 
+public Q_SLOTS:
     /*!
      * \brief Set copy/paste button state: hide it, show copy or show paste
      *  \param copyAvailable True if text is selected

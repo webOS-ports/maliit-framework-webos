@@ -85,7 +85,7 @@ public:
     //! Return true if the key is enabled; otherwise return false.
     bool enabled() const;
 
-
+public Q_SLOTS:
     //! Sets text for the key
     void setLabel(const QString &label);
 

@@ -96,7 +96,13 @@ namespace
     }
 }
 
-bool validateSettingValue(Maliit::SettingEntryType type, const QVariantMap& attributes, const QVariant &value)
+// Takes the map by value to match the declaration in the installed
+// maliit/settingdata.h. Passing it by reference would be cheaper, but the
+// header is public API: changing the signature breaks every out-of-tree
+// plugin that links against it, which is not a trade worth making for a
+// validator called once per settings write.
+// NOLINTNEXTLINE(performance-unnecessary-value-param)
+bool validateSettingValue(Maliit::SettingEntryType type, const QVariantMap attributes, const QVariant &value)
 {
     QVariant domain = attributes[Maliit::SettingEntryAttributes::valueDomain];
     QVariant range_min = attributes[Maliit::SettingEntryAttributes::valueRangeMin];

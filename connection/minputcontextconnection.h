@@ -314,7 +314,7 @@ public: // Inbound communication handlers
      */
     void loadPluginSettings(int connectionId, const QString &descriptionLanguage);
 
-
+public Q_SLOTS:
     //! Update \a region covered by virtual keyboard
     virtual void updateInputMethodArea(const QRegion &region);
 

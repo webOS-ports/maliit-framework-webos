@@ -41,7 +41,7 @@ public:
 
     bool present;
 
-
+public Q_SLOTS:
     void evdevEvent();
 
 Q_SIGNALS:
