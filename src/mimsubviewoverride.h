@@ -30,7 +30,7 @@ class MImSubViewOverride
 
 public:
     explicit MImSubViewOverride(MImOnScreenPlugins *plugins,
-                                QObject *parent = 0);
+                                QObject *parent = nullptr);
     virtual ~MImSubViewOverride();
 
 private:

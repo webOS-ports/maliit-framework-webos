@@ -54,24 +54,24 @@ public:
 
     //! Returns the focus widget's input method hints.
     //! \param changed whether this value changed with this event.
-    Qt::InputMethodHints hints(bool *changed = 0) const;
+    Qt::InputMethodHints hints(bool *changed = nullptr) const;
 
     //! Returns whether western numeric input should be shown, overridding
     //! language-specific numeric inputs.
     //! False by default.
     //! \param changed whether this value changed with this event.
-    bool westernNumericInputEnforced(bool *changed = 0) const;
+    bool westernNumericInputEnforced(bool *changed = nullptr) const;
 
     //! Returns whether input field has Qt::ImhPreferNumbers hint set.
     //! False by default.
     //! \param changed whether this value changed with this event.
-    bool preferNumbers(bool *changed = 0) const;
+    bool preferNumbers(bool *changed = nullptr) const;
 
     //! Returns whether the input method should be styled translucently. Useful
     //! when apps need to display a lot of information, for example terminals.
     //! False by default.
     //! \param changed whether this value changed with this event.
-    bool translucentInputMethod(bool *changed = 0) const;
+    bool translucentInputMethod(bool *changed = nullptr) const;
 
 private:
     Q_DISABLE_COPY(MImUpdateEvent)

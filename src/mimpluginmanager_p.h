@@ -71,7 +71,7 @@ class MIMPluginManagerPrivate
 {
     Q_DECLARE_PUBLIC(MIMPluginManager)
 public:
-    typedef QSet<Maliit::HandlerState> PluginState;
+    using PluginState = QSet<Maliit::HandlerState>;
 
     enum ShowInputMethodRequest {
         DontShowInputMethod,
@@ -88,9 +88,9 @@ public:
         QSharedPointer<Maliit::WindowGroup> windowGroup;
     };
 
-    typedef QMap<Maliit::Plugins::InputMethodPlugin *, PluginDescription> Plugins;
-    typedef QSet<Maliit::Plugins::InputMethodPlugin *> ActivePlugins;
-    typedef QMap<Maliit::HandlerState, Maliit::Plugins::InputMethodPlugin *> HandlerMap;
+    using Plugins = QMap<Maliit::Plugins::InputMethodPlugin *, PluginDescription>;
+    using ActivePlugins = QSet<Maliit::Plugins::InputMethodPlugin *>;
+    using HandlerMap = QMap<Maliit::HandlerState, Maliit::Plugins::InputMethodPlugin *>;
 
     MIMPluginManagerPrivate(const QSharedPointer<MInputContextConnection>& connection,
                             const QSharedPointer<Maliit::AbstractPlatform> &platform,
@@ -103,7 +103,7 @@ public:
     void loadPlugins(QStringList &pluginDirs);
     Maliit::Plugins::InputMethodPlugin* loadPlugin(const QDir &dir, const QString &fileName);
     bool unloadPlugin(Maliit::Plugins::InputMethodPlugin *plugin);
-    void addHandlerMap(Maliit::HandlerState state, const QString &pluginName);
+    void addHandlerMap(Maliit::HandlerState state, const QString &pluginId);
     void registerSettings();
     void registerSettings(const MImPluginSettingsInfo &info);
     MImPluginSettingsInfo globalSettings() const;
@@ -114,7 +114,7 @@ public:
     void replacePlugin(Maliit::SwitchDirection direction, Maliit::Plugins::InputMethodPlugin *source,
                        Plugins::iterator replacement, const QString &subViewId);
     bool switchPlugin(Maliit::SwitchDirection direction, MAbstractInputMethod *initiator);
-    bool switchPlugin(const QString &name,
+    bool switchPlugin(const QString &pluginId,
                       MAbstractInputMethod *initiator,
                       const QString &subViewId = QString());
     bool trySwitchPlugin(Maliit::SwitchDirection direction,
@@ -123,11 +123,11 @@ public:
                          const QString &subViewId = QString());
     void changeHandlerMap(Maliit::Plugins::InputMethodPlugin *origin,
                           Maliit::Plugins::InputMethodPlugin *replacement,
-                          QSet<Maliit::HandlerState> states);
+                          const QSet<Maliit::HandlerState>& states);
 
     QStringList loadedPluginsNames() const;
     QStringList loadedPluginsNames(Maliit::HandlerState state) const;
-    QList<MImPluginDescription> pluginDescriptions(Maliit::HandlerState) const;
+    QList<MImPluginDescription> pluginDescriptions(Maliit::HandlerState /*state*/) const;
     Plugins::const_iterator findEnabledPlugin(Plugins::const_iterator current,
                                               Maliit::SwitchDirection direction,
                                               Maliit::HandlerState state) const;
@@ -157,7 +157,7 @@ public:
     /*!
      * \brief This method is called when activeSubview is changed by settings or plugin.
      */
-    void _q_setActiveSubView(const QString &, Maliit::HandlerState);
+    void _q_setActiveSubView(const QString & /*subViewId*/, Maliit::HandlerState /*state*/);
 
     /*!
      * \brief Called in response to changed active on screen subview key change
@@ -170,7 +170,7 @@ public:
     QList<MImOnScreenPlugins::SubView> availablePluginsAndSubViews(Maliit::HandlerState state
                                                                     = Maliit::OnScreen) const;
     QString activeSubView(Maliit::HandlerState state) const;
-    void setActivePlugin(const QString &pluginName, Maliit::HandlerState state);
+    void setActivePlugin(const QString &pluginId, Maliit::HandlerState state);
 
     QString inputSourceName(Maliit::HandlerState source) const;
 
@@ -200,7 +200,7 @@ public:
 
     bool visible;
 
-    typedef QMap<Maliit::HandlerState, QString> InputSourceToNameMap;
+    using InputSourceToNameMap = QMap<Maliit::HandlerState, QString>;
     InputSourceToNameMap inputSourceToNameMap;
 
     MAttributeExtensionId toolbarId;

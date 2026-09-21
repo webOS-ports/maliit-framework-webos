@@ -27,10 +27,12 @@
 
 #include <QDebug>
 
-typedef QList<MImSettingsLunaSettingsBackendPrivate *> SettingsList;
+using SettingsList = QList<MImSettingsLunaSettingsBackendPrivate *>;
 
-static SettingsList g_managerSettingsList;
-static SettingsList g_pluginSettingsList;
+namespace {
+SettingsList g_managerSettingsList;
+SettingsList g_pluginSettingsList;
+} // namespace
 
 struct MImSettingsLunaSettingsBackendPrivate {
     MImSettingsLunaSettingsBackend* backend;
@@ -38,7 +40,7 @@ struct MImSettingsLunaSettingsBackendPrivate {
     MImSettings::Group group;
     QVariant value;
 
-    void setJsonValue(QVariant jsonValue)
+    void setJsonValue(const QVariant& jsonValue)
     {
         if (value != jsonValue) {
             value = jsonValue;
@@ -64,12 +66,10 @@ struct MImSettingsLunaSettingsBackendPrivate {
     {
         switch (group) {
         case MImSettings::GroupManager:
-            if (!g_managerSettingsList.contains(this))
-                g_managerSettingsList.append(this);
+            g_managerSettingsList.removeOne(this);
             break;
         case MImSettings::GroupPlugin:
-            if (g_pluginSettingsList.contains(this))
-                g_pluginSettingsList.removeOne(this);
+            g_pluginSettingsList.removeOne(this);
             break;
         }
     }
@@ -88,8 +88,7 @@ QVariant MImSettingsLunaSettingsBackend::value(const QVariant &def) const
 
     if (d->value.isNull())
         return def;
-    else
-        return d->value;
+            return d->value;
 }
 
 void MImSettingsLunaSettingsBackend::set(const QVariant &val)
@@ -130,7 +129,9 @@ MImSettingsLunaSettingsBackend::~MImSettingsLunaSettingsBackend()
     d->unregisterInstance();
 }
 
-static inline void processResponse(MImSettingsLunaSettingsBackendPrivate *d, QJsonObject &response)
+namespace {
+
+inline void processResponse(MImSettingsLunaSettingsBackendPrivate *d, QJsonObject &response)
 {
     QJsonObject::const_iterator it;
     if ((it = response.find("settings")) != response.end()) {
@@ -146,7 +147,7 @@ static inline void processResponse(MImSettingsLunaSettingsBackendPrivate *d, QJs
     }
 }
 
-static bool getSystemSettingsCallback(LSHandle *handle, LSMessage *message, void *ctx)
+bool getSystemSettingsCallback(LSHandle *handle, LSMessage *message, void *ctx)
 {
     Q_UNUSED(handle);
     Q_UNUSED(ctx);
@@ -171,12 +172,14 @@ static bool getSystemSettingsCallback(LSHandle *handle, LSMessage *message, void
     return true;
 }
 
-static bool serverConnectCallback(LSHandle *handle, LSMessage *message, void *ctx)
+bool serverConnectCallback(LSHandle *handle, LSMessage *message, void *ctx)
 {
     MImSettingsLunaSettingsBackendFactory *factory =
         static_cast<MImSettingsLunaSettingsBackendFactory *>(ctx);
     return factory->serverConnectCallback(handle, message, ctx);
 }
+
+} // namespace
 
 struct LunaServiceRequestInfoMap {
     const char *key;
@@ -193,7 +196,7 @@ static const LunaServiceRequestInfoMap g_lunaServiceRequestInfoMap[] = {
         "{\"subscribe\":true, \"configNames\":[\"%1\"]}" },
     { "com.webos.service.ime.static", "luna://com.webos.service.config/getConfigs",
         "{\"subscribe\":true, \"configNames\":[\"%1\"]}" },
-    { 0, 0, 0 }
+    { nullptr, nullptr, nullptr }
 };
 
 void MImSettingsLunaSettingsBackendFactory::subscribeSettings(const QString &key)
@@ -207,7 +210,7 @@ void MImSettingsLunaSettingsBackendFactory::subscribeSettings(const QString &key
         return;
 
     const LunaServiceRequestInfoMap *map;
-    for (map = g_lunaServiceRequestInfoMap; map->key != 0; map++)
+    for (map = g_lunaServiceRequestInfoMap; map->key != nullptr; map++)
         if (!key.compare(map->key))
             break;
 
@@ -221,6 +224,7 @@ void MImSettingsLunaSettingsBackendFactory::subscribeSettings(const QString &key
 
     if (!ret) {
         qWarning() << "failed LSCall " << map->serviceUrl << ": " << error.message;
+        LSErrorFree(&error);
         return;
     }
 
@@ -235,7 +239,10 @@ void MImSettingsLunaSettingsBackendFactory::unsubscribeSettings(const QString &k
 
     if (m_subscriptionMap.contains(key) && m_subscriptionMap.value(key) != LSMESSAGE_TOKEN_INVALID) {
         token = (LSMessageToken)m_subscriptionMap.value(key);
-        LSCallCancel(m_handle, token, &error);
+        if (!LSCallCancel(m_handle, token, &error)) {
+            qWarning() << "failed to cancel subscription for " << key << ": " << error.message;
+            LSErrorFree(&error);
+        }
 
         m_subscriptionMap.insert(key, LSMESSAGE_TOKEN_INVALID);
     }
@@ -272,13 +279,12 @@ bool MImSettingsLunaSettingsBackendFactory::serverConnectCallback(LSHandle *hand
         return false;
 
     QJsonObject json = QJsonDocument::fromJson(jsonString).object();
-    if (json["connected"].toBool() != true)
+    if (!json["connected"].toBool())
     {
         unsubscribeAll();
         return false;
-    } else {
-        restoreSubscriptions();
-    }
+    }         restoreSubscriptions();
+
 
     return true;
 }
@@ -302,15 +308,17 @@ void MImSettingsLunaSettingsBackendFactory::registerService()
     ret = LSGmainAttach(m_handle, m_mainLoop, &error);
     if (!ret) {
         qCritical() << "Failed to attach service to main loop: " << error.message;
+        LSErrorFree(&error);
         exit(1);
     }
 
     ret = LSCall(m_handle,
             "palm://com.palm.lunabus/signal/registerServerStatus",
             "{\"serviceName\":\"com.webos.settingsservice\"}",
-            ::serverConnectCallback, this, NULL, &error);
+            ::serverConnectCallback, this, nullptr, &error);
     if (!ret) {
         qCritical() << "Failed in calling palm://com.palm.lunabus/signal/registerServerStatus: " << error.message;
+        LSErrorFree(&error);
         exit(1);
     }
 }
@@ -323,13 +331,16 @@ void MImSettingsLunaSettingsBackendFactory::unregisterService()
 
         LSError error;
         LSErrorInit(&error);
-        LSUnregister(m_handle, &error);
-        m_handle = NULL;
+        if (!LSUnregister(m_handle, &error)) {
+            qWarning() << "failed to unregister service: " << error.message;
+            LSErrorFree(&error);
+        }
+        m_handle = nullptr;
     }
 }
 
 MImSettingsLunaSettingsBackendFactory::MImSettingsLunaSettingsBackendFactory()
-    : MImSettingsQSettingsBackendFactory()
+
 {
     m_mainCtx = g_main_context_default();
     m_mainLoop = g_main_loop_new(m_mainCtx, TRUE);
@@ -351,37 +362,49 @@ MImSettingsLunaSettingsBackendFactory::~MImSettingsLunaSettingsBackendFactory()
     unregisterService();
 }
 
-static const char *ACCESSORY_ENABLED = "/maliit/accessoryenabled";
-static const char *ONSCREEN_ACTIVE = "/maliit/onscreen/active";
-static const char *CURRENT_LANGUAGE = "/maliit/onscreen/currentlanguage";
+namespace {
+const char * const ACCESSORY_ENABLED = "/maliit/accessoryenabled";
+const char * const ONSCREEN_ACTIVE = "/maliit/onscreen/active";
+const char * const CURRENT_LANGUAGE = "/maliit/onscreen/currentlanguage";
+} // namespace
+
+MImSettingsBackend *MImSettingsLunaSettingsBackendFactory::subscribedBackend(const QString &name,
+                                                                            const MImSettings::Group group,
+                                                                            QObject *parent)
+{
+    MImSettingsBackend *settings = new MImSettingsLunaSettingsBackend(name, group, parent);
+    subscribeSettings(name);
+
+    return settings;
+}
 
 MImSettingsBackend *MImSettingsLunaSettingsBackendFactory::create(const QString &key, const MImSettings::Group group, QObject *parent)
 {
     qInfo() << "Creating MImSettingsBackend for" << key;
 
+    // Keys the settings service owns are subscribed to on first use; the rest
+    // fall through to the QSettings store, some under a fixed name.
     if (key.endsWith("localeInfo")) {
-        MImSettingsBackend *settings = new MImSettingsLunaSettingsBackend("localeInfo", group, parent);
-        subscribeSettings("localeInfo");
-        return settings;
-    } else if (key.endsWith("country")) {
-        MImSettingsBackend *settings = new MImSettingsLunaSettingsBackend("country", group, parent);
-        subscribeSettings("country");
-        return settings;
-    } else if (key.endsWith("timeout")) {
-        MImSettingsBackend *settings = new MImSettingsLunaSettingsBackend("com.webos.service.ime.timeout", group, parent);
-        subscribeSettings("com.webos.service.ime.timeout");
-        return settings;
-    } else if (key.endsWith("static")) {
-        MImSettingsBackend *settings = new MImSettingsLunaSettingsBackend("com.webos.service.ime.static", group, parent);
-        subscribeSettings("com.webos.service.ime.static");
-        return settings;
-    } else if (key.endsWith("currentLanguage")) {
-        return MImSettingsQSettingsBackendFactory::create(CURRENT_LANGUAGE, group, parent);
-    } else if (key.endsWith("accessoryenabled")) {
-        return MImSettingsQSettingsBackendFactory::create(ACCESSORY_ENABLED, group, parent);
-    } else if (key.endsWith("onscreen/active")) {
-        return MImSettingsQSettingsBackendFactory::create(ONSCREEN_ACTIVE, group, parent);
-    } else {
-        return MImSettingsQSettingsBackendFactory::create(key, group, parent);
+        return subscribedBackend("localeInfo", group, parent);
     }
+    if (key.endsWith("country")) {
+        return subscribedBackend("country", group, parent);
+    }
+    if (key.endsWith("timeout")) {
+        return subscribedBackend("com.webos.service.ime.timeout", group, parent);
+    }
+    if (key.endsWith("static")) {
+        return subscribedBackend("com.webos.service.ime.static", group, parent);
+    }
+    if (key.endsWith("currentLanguage")) {
+        return MImSettingsQSettingsBackendFactory::create(CURRENT_LANGUAGE, group, parent);
+    }
+    if (key.endsWith("accessoryenabled")) {
+        return MImSettingsQSettingsBackendFactory::create(ACCESSORY_ENABLED, group, parent);
+    }
+    if (key.endsWith("onscreen/active")) {
+        return MImSettingsQSettingsBackendFactory::create(ONSCREEN_ACTIVE, group, parent);
+    }
+
+    return MImSettingsQSettingsBackendFactory::create(key, group, parent);
 }

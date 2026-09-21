@@ -52,11 +52,11 @@ protected:
 
     void startService();
     void broadcastWidgetState();
-    void broadcastToSubscribers(QJsonObject response);
+    void broadcastToSubscribers(const QJsonObject& response);
     bool hasSubscribers() const;
 
     QJsonObject getWidgetStateJson() const;
-    void insertText(const QString& text, bool replace, ssize_t length = 0);
+    void insertText(const QString& text, bool replace, int length = 0);
     void deleteCharacters(int numChars, DeleteMode mode);
     void sendEnterKey();
 

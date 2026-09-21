@@ -38,9 +38,7 @@ private:
     Q_DISABLE_COPY(MImServerPrivate)
 };
 
-MImServerPrivate::MImServerPrivate()
-{
-}
+MImServerPrivate::MImServerPrivate() = default;
 
 MImServer::MImServer(const QSharedPointer<MInputContextConnection> &icConnection,
                      const QSharedPointer<Maliit::AbstractPlatform> &platform,
@@ -57,9 +55,7 @@ MImServer::MImServer(const QSharedPointer<MInputContextConnection> &icConnection
     webOSLogInfo("VKB_VERSION", "FRAMEWORK", MALIIT_VERSION);
 }
 
-MImServer::~MImServer()
-{
-}
+MImServer::~MImServer() = default;
 
 void MImServer::configureSettings(MImServer::SettingsType settingsType)
 {

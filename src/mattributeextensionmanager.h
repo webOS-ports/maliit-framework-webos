@@ -94,6 +94,7 @@ public:
                               const QString &targetItem,
                               const QString &attribute,
                               const QVariant &value);
+
 public Q_SLOTS:
     /*!
      * \brief Set copy/paste button state: hide it, show copy or show paste
@@ -152,7 +153,7 @@ private:
      */
     QList<MAttributeExtensionId> attributeExtensionIdList() const;
 
-    typedef QHash<MAttributeExtensionId, QSharedPointer<MAttributeExtension> > AttributeExtensionContainer;
+    using AttributeExtensionContainer = QHash<MAttributeExtensionId, QSharedPointer<MAttributeExtension> >;
     //! all registered attribute extensions
     AttributeExtensionContainer attributeExtensions;
 

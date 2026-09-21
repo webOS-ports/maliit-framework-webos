@@ -16,12 +16,13 @@
 #include "mimsettingsqsettings.h"
 #include "config.h"
 
-#include <QSettings>
+#include <QDebug>
 #include <QPointer>
+#include <QSettings>
 
 
-typedef QList<MImSettingsQSettingsBackend *> Items;
-typedef QHash<QString, Items> ItemMap;
+using Items = QList<MImSettingsQSettingsBackend *>;
+using ItemMap = QHash<QString, Items>;
 
 namespace
 {
@@ -54,6 +55,8 @@ struct MImSettingsQSettingsBackendPrivate {
     void unregisterInstance(MImSettingsQSettingsBackend *instance)
     {
         ItemMap::iterator items = registry.find(key);
+        if (items == registry.end())
+            return;
 
         items->removeOne(instance);
         if (items->isEmpty())
@@ -66,6 +69,8 @@ struct MImSettingsQSettingsBackendPrivate {
         // one slot deletes another MImSettings instance for this key
         QList<QPointer<MImSettingsQSettingsBackend> > items;
         ItemMap::iterator it = registry.find(key);
+        if (it == registry.end())
+            return;
 
         Q_FOREACH (MImSettingsQSettingsBackend *item, *it) {
             items.append(item);
@@ -175,9 +180,7 @@ MImSettingsQSettingsBackendFactory::MImSettingsQSettingsBackendFactory(const QSt
     Q_UNUSED(application);
 }
 
-MImSettingsQSettingsBackendFactory::~MImSettingsQSettingsBackendFactory()
-{
-}
+MImSettingsQSettingsBackendFactory::~MImSettingsQSettingsBackendFactory() = default;
 
 MImSettingsBackend *MImSettingsQSettingsBackendFactory::create(const QString &key, const MImSettings::Group group, QObject *parent)
 {
@@ -188,18 +191,18 @@ MImSettingsBackend *MImSettingsQSettingsBackendFactory::create(const QString &ke
 
 /* QSettings backend backed by a temporary file */
 MImSettingsQSettingsTemporaryBackendFactory::MImSettingsQSettingsTemporaryBackendFactory()
-    : mTempFile()
+
 {
     // Force backing file to be created, otherwise fileName() returns empty
-    mTempFile.open();
+    if (!mTempFile.open()) {
+        qFatal("Could not create the temporary file backing the settings.");
+    }
     mTempFile.close();
 
     mSettings.reset(new QSettings(mTempFile.fileName(), QSettings::IniFormat));
 }
 
-MImSettingsQSettingsTemporaryBackendFactory::~MImSettingsQSettingsTemporaryBackendFactory()
-{
-}
+MImSettingsQSettingsTemporaryBackendFactory::~MImSettingsQSettingsTemporaryBackendFactory() = default;
 
 MImSettingsBackend *MImSettingsQSettingsTemporaryBackendFactory::create(const QString &key, const MImSettings::Group group, QObject *parent)
 {

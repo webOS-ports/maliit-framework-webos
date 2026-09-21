@@ -16,8 +16,7 @@
 namespace Maliit
 {
 
-AbstractPlatform::~AbstractPlatform()
-{}
+AbstractPlatform::~AbstractPlatform() = default;
 
 void AbstractPlatform::setApplicationWindow(QWindow *window, WId appWindowId)
 {

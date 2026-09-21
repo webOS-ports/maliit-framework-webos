@@ -26,13 +26,9 @@ namespace
     };
 }
 
-MKeyOverrideData::MKeyOverrideData()
-{
-}
+MKeyOverrideData::MKeyOverrideData() = default;
 
-MKeyOverrideData::~MKeyOverrideData()
-{
-}
+MKeyOverrideData::~MKeyOverrideData() = default;
 
 QList<QSharedPointer<MKeyOverride> > MKeyOverrideData::keyOverrides() const
 {

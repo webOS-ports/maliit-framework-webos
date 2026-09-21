@@ -23,9 +23,7 @@
 #include <QDebug>
 
 #include <algorithm>
-#include <tr1/functional>
-
-using namespace std::tr1::placeholders;
+#include <iterator>
 
 namespace
 {
@@ -35,11 +33,6 @@ namespace
     bool equalPlugin(const MImOnScreenPlugins::SubView &subView, const QString &plugin)
     {
         return subView.plugin == plugin;
-    }
-
-    bool notEqualPlugin(const MImOnScreenPlugins::SubView &subView, const QString &plugin)
-    {
-        return subView.plugin != plugin;
     }
 
     QStringList toSettings(const QList<MImOnScreenPlugins::SubView> &subViews)
@@ -69,9 +62,8 @@ namespace
 }
 
 MImOnScreenPlugins::SubView::SubView()
-    : plugin()
-    , id()
-{}
+
+= default;
 
 MImOnScreenPlugins::SubView::SubView(const QString &new_plugin,
                                      const QString &new_id)
@@ -86,11 +78,7 @@ bool MImOnScreenPlugins::SubView::operator==(const MImOnScreenPlugins::SubView &
 }
 
 MImOnScreenPlugins::MImOnScreenPlugins():
-    QObject(),
-    mAvailableSubViews(),
-    mEnabledSubViews(),
-    mLastEnabledSubViews(),
-    mActiveSubView(),
+
     mEnabledSubViewsSettings(EnabledSubViews),
     mActiveSubViewSettings(ActiveSubView),
     mAllSubviewsEnabled(false)
@@ -107,12 +95,13 @@ bool MImOnScreenPlugins::isEnabled(const QString &plugin) const
 {
     QList<MImOnScreenPlugins::SubView> mEnabledAndAvailableSubViews;
 
-    std::remove_copy_if(mEnabledSubViews.begin(), mEnabledSubViews.end(),
-                        std::back_inserter(mEnabledAndAvailableSubViews),
-                        std::tr1::bind(&MImOnScreenPlugins::isSubViewUnavailable, this, _1));
+    std::copy_if(mEnabledSubViews.begin(), mEnabledSubViews.end(),
+                 std::back_inserter(mEnabledAndAvailableSubViews),
+                 [this](const SubView &subView) { return isSubViewAvailable(subView); });
 
     return std::find_if(mEnabledAndAvailableSubViews.begin(), mEnabledAndAvailableSubViews.end(),
-                        std::tr1::bind(equalPlugin, _1, plugin)) != mEnabledAndAvailableSubViews.end();
+                        [&plugin](const SubView &subView) { return equalPlugin(subView, plugin); })
+           != mEnabledAndAvailableSubViews.end();
 }
 
 bool MImOnScreenPlugins::isSubViewEnabled(const SubView &subView) const
@@ -128,8 +117,9 @@ QList<MImOnScreenPlugins::SubView> MImOnScreenPlugins::enabledSubViews() const
 QList<MImOnScreenPlugins::SubView> MImOnScreenPlugins::enabledSubViews(const QString &plugin) const
 {
     QList<MImOnScreenPlugins::SubView> result;
-    std::remove_copy_if(mEnabledSubViews.begin(), mEnabledSubViews.end(),
-                        std::back_inserter(result), std::tr1::bind(notEqualPlugin, _1, plugin));
+    std::copy_if(mEnabledSubViews.begin(), mEnabledSubViews.end(),
+                 std::back_inserter(result),
+                 [&plugin](const SubView &subView) { return equalPlugin(subView, plugin); });
     return result;
 }
 

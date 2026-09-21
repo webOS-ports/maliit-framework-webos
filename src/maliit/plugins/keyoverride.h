@@ -56,7 +56,7 @@ public:
     /*!
      * \brief Copy constructor
      */
-    MKeyOverride(const MKeyOverride&);
+    MKeyOverride(const MKeyOverride& /*other*/);
 
     /*!
     * \brief Destructor

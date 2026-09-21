@@ -18,16 +18,14 @@
 // This file is based on mkeyboardstatetracker.cpp from libmeegotouch
 
 #include <QSocketNotifier>
+#include <QDebug>
 
 #include <libudev.h>
 #include <linux/input.h>
 
+#include "mimevdevbits.h"
 #include "mimhwkeyboardtracker.h"
 #include "mimhwkeyboardtracker_p.h"
-
-/* bit array ops */
-#define BITS2BYTES(x) ((((x) - 1) / 8) + 1)
-#define TEST_BIT(bit, array) (array[(bit) / 8] & (1 << (bit) % 8))
 
 MImHwKeyboardTrackerPrivate::MImHwKeyboardTrackerPrivate(MImHwKeyboardTracker *q_ptr) :
     evdevTabletModePending(-1),
@@ -69,10 +67,16 @@ void MImHwKeyboardTrackerPrivate::detectEvdev()
         const char *syspath = udev_list_entry_get_name(device);
         struct udev_device *udev_device =
             udev_device_new_from_syspath(udev, syspath);
-        const char *device = udev_device_get_devnode(udev_device);
 
-        if (device)
-            tryEvdevDevice(device);
+        if (!udev_device)
+            continue;
+
+        // Deliberately not named "device": that is the loop variable
+        // udev_list_entry_foreach() advances.
+        const char *devnode = udev_device_get_devnode(udev_device);
+
+        if (devnode)
+            tryEvdevDevice(devnode);
 
         udev_device_unref(udev_device);
         if (present)
@@ -88,9 +92,19 @@ void MImHwKeyboardTrackerPrivate::evdevEvent()
 
     struct input_event ev;
 
-    qint64 len = evdevFile->read((char *) &ev, sizeof(ev));
-    if (len != sizeof(ev))
+    if (!evdevFile) {
         return;
+    }
+
+    qint64 len = evdevFile->read((char *) &ev, sizeof(ev));
+    if (len < 0) {
+        qWarning() << "Failed to read from the evdev node:" << evdevFile->errorString();
+        return;
+    }
+    if (len != sizeof(ev)) {
+        qWarning() << "Short read from the evdev node, discarding" << len << "bytes";
+        return;
+    }
 
     // We wait for a SYN before "committing" the new state, just in case.
     if (ev.type == EV_SW && ev.code == SW_TABLET_MODE) {
@@ -107,7 +121,7 @@ void MImHwKeyboardTrackerPrivate::evdevEvent()
 void MImHwKeyboardTrackerPrivate::tryEvdevDevice(const char *device)
 {
     QFile *qfile = new QFile(this);
-    unsigned char evbits[BITS2BYTES(EV_MAX)];
+    unsigned char evbits[EVDEV_BITS_BUFSIZE(EV_MAX)];
     int fd;
 
     qfile->setFileName(device);
@@ -133,7 +147,7 @@ void MImHwKeyboardTrackerPrivate::tryEvdevDevice(const char *device)
         return;
     }
 
-    unsigned char swbit[BITS2BYTES(EV_MAX)];
+    unsigned char swbit[EVDEV_BITS_BUFSIZE(EV_MAX)];
     if (ioctl(fd, EVIOCGBIT(EV_SW, SW_CNT), swbit) < 0) {
         delete qfile;
         return;
@@ -154,26 +168,21 @@ void MImHwKeyboardTrackerPrivate::tryEvdevDevice(const char *device)
     present = true;
 
     // Initialise initial tablet mode state
-    unsigned long state[BITS2BYTES(SW_MAX)];
+    unsigned char state[EVDEV_BITS_BUFSIZE(SW_MAX)];
     if (ioctl(fd, EVIOCGSW(SW_MAX), state) < 0)
         return;
 
     evdevTabletMode = TEST_BIT(SW_TABLET_MODE, state);
 }
 
-MImHwKeyboardTrackerPrivate::~MImHwKeyboardTrackerPrivate()
-{
-}
+MImHwKeyboardTrackerPrivate::~MImHwKeyboardTrackerPrivate() = default;
 
 MImHwKeyboardTracker::MImHwKeyboardTracker()
-    : QObject(),
-      d_ptr(new MImHwKeyboardTrackerPrivate(this))
+    : d_ptr(new MImHwKeyboardTrackerPrivate(this))
 {
 }
 
-MImHwKeyboardTracker::~MImHwKeyboardTracker()
-{
-}
+MImHwKeyboardTracker::~MImHwKeyboardTracker() = default;
 
 bool MImHwKeyboardTracker::isPresent() const
 {

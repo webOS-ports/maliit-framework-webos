@@ -28,7 +28,7 @@ public:
     friend bool operator==(const MImSubViewDescriptionPrivate &left,
                            const MImSubViewDescriptionPrivate &right);
 
-public:
+
     //! Plugin ID.
     QString pluginId;
 
@@ -75,6 +75,9 @@ MImSubViewDescription::~MImSubViewDescription()
 
 MImSubViewDescription &MImSubViewDescription::operator=(const MImSubViewDescription &other)
 {
+    if (this == &other)
+        return *this;
+
     *d_ptr = *other.d_ptr;
 
     return *this;

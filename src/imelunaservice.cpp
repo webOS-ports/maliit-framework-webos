@@ -16,8 +16,12 @@
 *
 * LICENSE@@@ */
 
+#include <algorithm>
+#include <climits>
+
 #include <QKeyEvent>
 #include "imelunaservice.h"
+#include "mimjsonparams.h"
 #include "minputcontextconnection.h"
 #include "luna-service2/lunaservice.h"
 #include "mimglobalsettings.h"
@@ -25,6 +29,7 @@
 const char *IMELunaService::SubscriberKey = "REMOTE_KEYBOARD_LIST";
 
 #include <QJsonObject>
+#include <utility>
 
 namespace {
 
@@ -38,6 +43,10 @@ public:
     QString message() const { return QString(err.message ? err.message : ""); }
 
     LSError err;
+
+private:
+    // The payload is owned by exactly one wrapper; copying would free it twice.
+    Q_DISABLE_COPY(LSErrorWrapper)
 };
 
 class LSMessageAdapter
@@ -53,14 +62,16 @@ public:
         return LSMessageIsSubscription(m_message);
     }
 
-    void addSubscription(const char *key)
+    bool addSubscription(const char *key)
     {
         LSErrorWrapper err;
 
         if (!LSSubscriptionAdd(LSMessageGetConnection(m_message), key, m_message, err)) {
             qWarning() << "failed to add subscription: " << err.message();
-            return;
+            return false;
         }
+
+        return true;
     }
 
     QString uniqueToken()
@@ -109,9 +120,9 @@ protected:
 } // namespace
 
 IMELunaService::IMELunaService(QSharedPointer<MInputContextConnection> connection)
-    : m_connection(connection)
-    , m_mainLoop(NULL)
-    , m_handle(NULL)
+    : m_connection(std::move(connection))
+    , m_mainLoop(nullptr)
+    , m_handle(nullptr)
     , m_focusChangedSinceLastBroadcast(false)
     , m_broadcastTimer(new QTimer(this))
 {
@@ -124,15 +135,18 @@ IMELunaService::IMELunaService(QSharedPointer<MInputContextConnection> connectio
 
 IMELunaService::~IMELunaService()
 {
-    if (m_mainLoop) {
-        g_main_loop_unref(m_mainLoop);
-        m_mainLoop = NULL;
-    }
-
     if (m_handle) {
         LSErrorWrapper err;
 
-        LSUnregister(m_handle, err);
+        if (!LSUnregister(m_handle, err)) {
+            qWarning() << "failed to unregister from the bus: " << err.message();
+        }
+        m_handle = nullptr;
+    }
+
+    if (m_mainLoop) {
+        g_main_loop_unref(m_mainLoop);
+        m_mainLoop = nullptr;
     }
 }
 
@@ -141,7 +155,7 @@ bool IMELunaService::hasSubscribers() const
     return !m_clientByToken.isEmpty();
 }
 
-void IMELunaService::broadcastToSubscribers(QJsonObject response)
+void IMELunaService::broadcastToSubscribers(const QJsonObject& response)
 {
     LSErrorWrapper err;
     QJsonDocument document(response);
@@ -287,22 +301,25 @@ void IMELunaService::onReset()
 }
 
 // Insert text at the current cursor position, replacing selected text (if any)
-void IMELunaService::insertText(const QString& text, bool replace, ssize_t length)
+void IMELunaService::insertText(const QString& text, bool replace, int length)
 {
     if (replace) {
         QString surroundingText;
         int cursorPos = 0;
 
-        // Find out how much text to replace
-        m_connection->surroundingText(surroundingText, cursorPos);
-
         if (length >= 0) {
             // Replace some text
             m_connection->sendCommitString(text, -length, length);
-        } else {
-            // Replace all text
-            m_connection->sendCommitString(text, -cursorPos, surroundingText.length());
+            return;
         }
+
+        // Replace all text, which needs to know where the cursor is
+        if (!m_connection->surroundingText(surroundingText, cursorPos) || cursorPos < 0) {
+            qWarning() << "no usable surrounding text, cannot replace the field contents";
+            return;
+        }
+
+        m_connection->sendCommitString(text, -cursorPos, surroundingText.length());
     } else {
         // Insert text at current cursor position
         m_connection->sendCommitString(text);
@@ -312,14 +329,23 @@ void IMELunaService::insertText(const QString& text, bool replace, ssize_t lengt
 // Delete characters at the current cursor position, or all selected text (if any)
 void IMELunaService::deleteCharacters(int numChars, DeleteMode mode)
 {
-    QString surroundingText;
-    int cursorPos = 0;
-
-    m_connection->surroundingText(surroundingText, cursorPos);
-
     if (mode == DirectMode) {
-        // Generally less reliable in practice but more consistent
+        QString surroundingText;
+        int cursorPos = 0;
+
+        // Generally less reliable in practice but more consistent.
+        // Without a cursor position there is nothing to count back from, and
+        // a negative count here would turn into a negative replace length.
+        if (!m_connection->surroundingText(surroundingText, cursorPos) || cursorPos < 0) {
+            qWarning() << "no usable surrounding text, cannot delete directly";
+            return;
+        }
+
         numChars = std::min(numChars, cursorPos);
+        if (numChars <= 0) {
+            return;
+        }
+
         m_connection->sendCommitString("", -numChars, numChars);
     } else {
         bool valid = false;
@@ -392,7 +418,13 @@ bool IMELunaService::handleRegisterRemoteKeyboard(LSHandle *handle, LSMessage *m
     LSMessageAdapter msg(message);
 
     if (msg.isSubscription()) {
-        msg.addSubscription(IMELunaService::SubscriberKey);
+        if (!msg.addSubscription(IMELunaService::SubscriberKey)) {
+            // Without a subscription there is no cancel callback either, so
+            // recording the client would leave an entry that never goes away
+            // and keeps hasSubscribers() true forever.
+            msg.replyError("Failed to add subscription");
+            return true;
+        }
 
         // Track subscription
         QString token = msg.uniqueToken();
@@ -457,16 +489,22 @@ bool IMELunaService::handleInsertText(LSHandle *handle, LSMessage *message, void
     QJsonValue replaceParam = payload["replace"];
     QJsonValue replaceLengthParam = payload["replaceLength"];
 
-    if (textParam.isString()) {
-        bool replace = replaceParam.isBool() ? replaceParam.toBool() : false;
-        ssize_t length = replaceLengthParam.isDouble() ?
-                         ((int) replaceLengthParam.toDouble(-1)) : -1;
-
-        service->insertText(textParam.toString(), replace, length);
-        msg.replyTrue();
-    } else {
+    if (!textParam.isString()) {
         msg.replyError("Missing \"text\" parameter");
+        return true;
     }
+
+    const bool replace = replaceParam.isBool() ? replaceParam.toBool() : false;
+    int length = -1;
+
+    if (replaceLengthParam.isDouble()
+        && !Maliit::Json::toInt(replaceLengthParam, INT_MIN, INT_MAX, &length)) {
+        msg.replyError("Invalid \"replaceLength\" parameter");
+        return true;
+    }
+
+    service->insertText(textParam.toString(), replace, length);
+    msg.replyTrue();
 
     return true;
 }
@@ -515,12 +553,14 @@ bool IMELunaService::handleDeleteCharacters(LSHandle *handle, LSMessage *message
         }
     }
 
-    if (characterCount.isDouble() && characterCount.toDouble() > 0) {
-        service->deleteCharacters((int) characterCount.toDouble(), mode);
-        msg.replyTrue();
-    } else {
+    int count = 0;
+    if (!Maliit::Json::toInt(characterCount, 1, INT_MAX, &count)) {
         msg.replyError("Missing or invalid \"count\" parameter");
+        return true;
     }
+
+    service->deleteCharacters(count, mode);
+    msg.replyTrue();
 
     return true;
 }
@@ -582,7 +622,7 @@ LSMethod IMELunaService::ime_bus_methods [] = {
     {"deleteCharacters", IMELunaService::handleDeleteCharacters, (LSMethodFlags) 0},
     {"sendEnterKey", IMELunaService::handleSendEnterKey, (LSMethodFlags) 0},
 
-    {0, 0, (LSMethodFlags) 0}
+    {nullptr, nullptr, (LSMethodFlags) 0}
 };
 
 void IMELunaService::startService()
@@ -605,7 +645,7 @@ void IMELunaService::startService()
         return;
     }
 
-    if (!LSRegisterCategory(m_handle, "/", ime_bus_methods, NULL, NULL, err)) {
+    if (!LSRegisterCategory(m_handle, "/", ime_bus_methods, nullptr, nullptr, err)) {
         qCritical() << "failed to register category on bus: " << err.message();
         return;
     }

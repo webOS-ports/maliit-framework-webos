@@ -51,6 +51,7 @@ SERVER_HEADERS_PRIVATE += \
         mattributeextensionid.h \
         mattributeextensionmanager.h \
         msharedattributeextensionmanager.h \
+        mimevdevbits.h \
         mimhwkeyboardtracker.h \
         mimonscreenplugins.h \
         mimhwkeyboardtracker_p.h \
@@ -85,7 +86,7 @@ wayland {
 CONFIG += webos
 
 webos {
-    SERVER_HEADERS_PRIVATE += imelunaservice.h
+    SERVER_HEADERS_PRIVATE += imelunaservice.h mimjsonparams.h
     SERVER_SOURCES += imelunaservice.cpp
 }
 

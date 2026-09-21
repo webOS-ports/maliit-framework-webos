@@ -97,10 +97,10 @@ const wl_registry_listener maliit_registry_listener = {
 } // unnamed namespace
 
 WaylandPlatformPrivate::WaylandPlatformPrivate()
-    : m_registry(0),
-      m_panel(0),
-      m_panel_name(0),
-      m_scheduled_windows()
+    : m_registry(nullptr),
+      m_panel(nullptr),
+      m_panel_name(0)
+
 {
     wl_display *display = static_cast<wl_display *>(QGuiApplication::platformNativeInterface()->nativeResourceForIntegration("display"));
     if (!display) {
@@ -116,7 +116,7 @@ WaylandPlatformPrivate::~WaylandPlatformPrivate()
 {
     if (m_panel) {
         input_panel_destroy (m_panel);
-        m_panel = NULL;
+        m_panel = nullptr;
     }
     if (m_registry) {
         wl_registry_destroy (m_registry);
@@ -146,7 +146,7 @@ void WaylandPlatformPrivate::handleRegistryGlobalRemove(uint32_t name)
     qDebug() << "Name:" << name;
     if (m_panel and m_panel_name == name) {
         input_panel_destroy(m_panel);
-        m_panel = 0;
+        m_panel = nullptr;
     }
 }
 
@@ -157,7 +157,7 @@ void WaylandPlatformPrivate::setupInputSurface(QWindow *window,
     if (!window)
         return;
 
-    struct wl_surface *surface = avoid_crash ? 0 : static_cast<struct wl_surface *>(QGuiApplication::platformNativeInterface()->nativeResourceForWindow("surface", window));
+    struct wl_surface *surface = avoid_crash ? nullptr : static_cast<struct wl_surface *>(QGuiApplication::platformNativeInterface()->nativeResourceForWindow("surface", window));
 
     if (not surface) {
         if (avoid_crash) {
@@ -171,7 +171,9 @@ void WaylandPlatformPrivate::setupInputSurface(QWindow *window,
 
     surface = static_cast<struct wl_surface *>(QGuiApplication::platformNativeInterface()->nativeResourceForWindow("surface", window));
     qDebug() << "WId:" << window->winId();
-    if (surface) {
+    if (not m_panel) {
+        qWarning() << "No input_panel global, cannot set up the input surface.";
+    } else if (surface) {
         input_panel_surface *ip_surface = input_panel_get_input_panel_surface(m_panel, surface);
         input_panel_surface_position weston_position = maliitToWestonPosition (position);
 
@@ -185,9 +187,7 @@ WaylandPlatform::WaylandPlatform()
     : d_ptr(new WaylandPlatformPrivate)
 {}
 
-WaylandPlatform::~WaylandPlatform()
-{
-}
+WaylandPlatform::~WaylandPlatform() = default;
 
 void WaylandPlatform::setupInputPanel(QWindow* window,
                                       Maliit::Position position)
@@ -216,15 +216,33 @@ void WaylandPlatform::setInputRegion(QWindow* window,
     }
 
     QPlatformNativeInterface *wliface = QGuiApplication::platformNativeInterface();
-    wl_compositor *wlcompositor = static_cast<wl_compositor *>(wliface->nativeResourceForIntegration("compositor"));
-    wl_region *wlregion = wl_compositor_create_region(wlcompositor);
+    if (not wliface) {
+        return;
+    }
 
-    for (auto &rect: region) {
+    wl_compositor *wlcompositor = static_cast<wl_compositor *>(wliface->nativeResourceForIntegration("compositor"));
+    if (not wlcompositor) {
+        qWarning() << "No wl_compositor, cannot set the input region.";
+        return;
+    }
+
+    wl_surface *wlsurface = static_cast<wl_surface *>(wliface->nativeResourceForWindow("surface", window));
+    if (not wlsurface) {
+        qWarning() << "No wl_surface, cannot set the input region.";
+        return;
+    }
+
+    wl_region *wlregion = wl_compositor_create_region(wlcompositor);
+    if (not wlregion) {
+        qWarning() << "Failed to create a wl_region.";
+        return;
+    }
+
+    for (const auto &rect: region) {
         wl_region_add(wlregion, rect.x(), rect.y(),
                       rect.width(), rect.height());
     }
 
-    wl_surface *wlsurface = static_cast<wl_surface *>(wliface->nativeResourceForWindow("surface", window));
     wl_surface_set_input_region(wlsurface, wlregion);
     wl_region_destroy(wlregion);
 }

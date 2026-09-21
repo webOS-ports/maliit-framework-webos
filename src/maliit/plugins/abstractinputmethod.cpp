@@ -16,13 +16,14 @@
 #include <maliit/plugins/abstractinputmethodhost.h>
 
 #include <QKeyEvent>
+#include <QDebug>
 
 class MAbstractInputMethodPrivate
 {
 public:
     MAbstractInputMethodPrivate(MAbstractInputMethodHost *imHost,
                                 MAbstractInputMethod *parent);
-    ~MAbstractInputMethodPrivate();
+    ~MAbstractInputMethodPrivate() = default;
 
     MAbstractInputMethodHost *imHost;
 };
@@ -37,14 +38,10 @@ MAbstractInputMethodPrivate::MAbstractInputMethodPrivate(MAbstractInputMethodHos
 }
 
 
-MAbstractInputMethodPrivate::~MAbstractInputMethodPrivate()
-{
-}
-
 ///////////////
 
 MAbstractInputMethod::MAbstractInputMethod(MAbstractInputMethodHost *host)
-    : QObject(0), // MAbstractInputMethod is not deleted by mainWindow
+    : QObject(nullptr), // MAbstractInputMethod is not deleted by mainWindow
       d_ptr(new MAbstractInputMethodPrivate(host, this))
 {
 }
@@ -74,7 +71,7 @@ void MAbstractInputMethod::hide()
     // empty default implementation
 }
 
-void MAbstractInputMethod::setPreedit(const QString &, int)
+void MAbstractInputMethod::setPreedit(const QString & /*unused*/, int /*unused*/)
 {
     // empty default implementation
 }
@@ -125,6 +122,10 @@ void MAbstractInputMethod::processKeyEvent(QEvent::Type keyType, Qt::Key keyCode
                                            quint32 /* nativeScanCode */, quint32 /* nativeModifiers */,
                                            unsigned long /*time*/)
 {
+    if (count < 0 || count > USHRT_MAX) {
+        qWarning() << "This conversion from int to ushort may result in data lost, because the value exceeds USHRT_MAX. Before: " << count << ", After: " << USHRT_MAX;
+        return;
+    }
     // default implementation, just sendKeyEvent back
     inputMethodHost()->sendKeyEvent(QKeyEvent(keyType, keyCode, modifiers, text, autoRepeat,
                                               count));

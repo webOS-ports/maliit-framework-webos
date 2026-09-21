@@ -30,7 +30,7 @@ class MImSettingsLunaSettingsBackend : public MImSettingsBackend
 {
     Q_OBJECT
 public:
-    explicit MImSettingsLunaSettingsBackend(const QString &key, const MImSettings::Group group, QObject *parent = 0);
+    explicit MImSettingsLunaSettingsBackend(const QString &key, const MImSettings::Group group, QObject *parent = nullptr);
     virtual ~MImSettingsLunaSettingsBackend();
     virtual QString key() const;
     virtual QVariant value(const QVariant &def) const;
@@ -59,6 +59,11 @@ public:
     bool serverConnectCallback(LSHandle *handle, LSMessage *message, void *ctx);
 
 private:
+    //! Create a backend for \a name and subscribe to it on the settings service.
+    MImSettingsBackend *subscribedBackend(const QString &name,
+                                          const MImSettings::Group group,
+                                          QObject *parent);
+
     void registerService();
     void unregisterService();
 

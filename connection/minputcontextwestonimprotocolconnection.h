@@ -51,15 +51,15 @@ public:
 //    virtual QRect cursorRectangle(bool &valid);
     virtual bool hiddenText(bool &valid);
     virtual void sendPreeditString(const QString &string,
-                                   const QList<Maliit::PreeditTextFormat> &preedit_formats,
-                                   int replacement_start = 0,
-                                   int replacement_length = 0,
-                                   int cursor_pos = -1);
+                                   const QList<Maliit::PreeditTextFormat> &preeditFormats,
+                                   int replaceStart = 0,
+                                   int replaceLength = 0,
+                                   int cursorPos = -1);
     virtual void sendCommitString(const QString &string,
-                                  int replace_start = 0,
-                                  int replace_length = 0,
-                                  int cursor_pos = -1);
-    virtual void sendKeyEvent(const QKeyEvent &key_event, Maliit::EventRequestType request_type);
+                                  int replaceStart = 0,
+                                  int replaceLength = 0,
+                                  int cursorPos = -1);
+    virtual void sendKeyEvent(const QKeyEvent &keyEvent, Maliit::EventRequestType requestType);
 //    virtual void notifyImInitiatedHiding();
 //    virtual void invokeAction(const QString &action,
 //                              const QKeySequence &sequence);

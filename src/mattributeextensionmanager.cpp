@@ -42,9 +42,7 @@ MAttributeExtensionManager::MAttributeExtensionManager()
 {
 }
 
-MAttributeExtensionManager::~MAttributeExtensionManager()
-{
-}
+MAttributeExtensionManager::~MAttributeExtensionManager() = default;
 
 QList<MAttributeExtensionId> MAttributeExtensionManager::attributeExtensionIdList() const
 {
@@ -78,15 +76,9 @@ void MAttributeExtensionManager::setCopyPasteState(bool copyAvailable, bool past
     if (copyPasteStatus == newStatus)
         return;
 
+    // Recorded only; the copy/paste button it used to drive is gone, so
+    // there is nothing to do per state.
     copyPasteStatus = newStatus;
-    switch (newStatus) {
-    case Maliit::InputMethodNoCopyPaste:
-        break;
-    case Maliit::InputMethodCopy:
-        break;
-    case Maliit::InputMethodPaste:
-        break;
-    }
 }
 
 void MAttributeExtensionManager::registerAttributeExtension(const MAttributeExtensionId &id, const QString &fileName)
@@ -171,7 +163,11 @@ void MAttributeExtensionManager::setExtendedAttribute(const MAttributeExtensionI
         bool newKeyOverrideCreated = extension->keyOverrideData()->createKeyOverride(targetItem);
         QSharedPointer<MKeyOverride> keyOverride = extension->keyOverrideData()->keyOverride(targetItem);
 
-        Q_ASSERT(keyOverride);
+        if (!keyOverride) {
+            qWarning() << "No key override for" << targetItem;
+            return;
+        }
+
         const QByteArray byteArray = attribute.toLatin1();
         const char * const c_str = byteArray.data();
 

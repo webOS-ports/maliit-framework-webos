@@ -36,7 +36,25 @@ contains(QT_MAJOR_VERSION, 4) {
     error("Qt 5 is required. For the Qt 4 input context see maliit-inputcontext-qt4. For a Qt 4 Maliit please use the 0.81 or 0.94-qt4 branches/release series instead")
 } else {
     SUBDIRS += connection src passthroughserver
+
+    # The unit tests link against the libraries above, so they come last. They
+    # are skipped entirely for CONFIG+=notests, which is what target image
+    # builds pass; see tests/README.md for how to build and run them.
+    !notests {
+        SUBDIRS += tests
+    }
 }
+
+# LS2 identity for MaliitServer: the role, service, permission, api and groups
+# files under service/ describe this repo's own binary, so they live here
+# rather than in whichever component happens to supply the keyboard plugin.
+# webos-service.prf (qt-features-webos) substitutes the *.in files and installs
+# all five into the luna-service2 directories; the manifest is generated from
+# them at package time. SBINDIR and MALIIT_SERVER come from config.pri, which
+# is included at the top of this file, and match passthroughserver.pro's
+# target.path so the paths cannot drift apart.
+CONFIG += webos-service
+WEBOS_SYSBUS_DIR = service
 
 QMAKE_EXTRA_TARGETS += check-xml
 check-xml.target = check-xml
@@ -51,11 +69,23 @@ DIST_PATH = $$OUT_PWD/$$DIST_NAME
 TARBALL_SUFFIX = .tar.bz2
 TARBALL_PATH = $$DIST_PATH$$TARBALL_SUFFIX
 
-# The 'make dist' target
-# Creates a tarball
-QMAKE_EXTRA_TARGETS += dist
-dist.target = dist
-dist.commands += git archive HEAD --prefix=$$DIST_NAME/ | bzip2 > $$TARBALL_PATH;
-dist.commands += md5sum $$TARBALL_PATH | cut -d \' \' -f 1 > $$DIST_PATH\\.md5
+# The 'make dist-tarball' target
+# Creates a bzip2 tarball of HEAD, plus its md5.
+#
+# Not called 'dist': the subdirs template generates a 'dist' rule of its own
+# (tar of the distdir it assembles), and declaring a second recipe for the
+# same target made make warn on every single invocation -
+#
+#     Makefile:725: warning: overriding recipe for target 'dist'
+#     Makefile:656: warning: ignoring old recipe for target 'dist'
+#
+# and then use qmake's, because it is emitted last. So this recipe was never
+# the one that ran. Giving it its own name both silences the warning and
+# makes it reachable; 'make dist' keeps doing what it has actually been doing
+# all along.
+QMAKE_EXTRA_TARGETS += dist_tarball
+dist_tarball.target = dist-tarball
+dist_tarball.commands += git archive HEAD --prefix=$$DIST_NAME/ | bzip2 > $$TARBALL_PATH;
+dist_tarball.commands += md5sum $$TARBALL_PATH | cut -d \' \' -f 1 > $$DIST_PATH\\.md5
 
 OTHER_FILES += NEWS README INSTALL.local

@@ -70,7 +70,7 @@ public:
         \param key    The name of the key.
         \param parent Parent object
     */
-    explicit MImSettings(const QString &key, const Group group = GroupManager, QObject *parent = 0);
+    explicit MImSettings(const QString &key, const Group group = GroupManager, QObject *parent = nullptr);
 
     /*! Finalizes a MImSettings.
      */
@@ -171,7 +171,7 @@ class MImSettingsBackend : public QObject
 public:
     /*! Initialized a MImSettingsBackend.
      */
-    explicit MImSettingsBackend(QObject *parent = 0);
+    explicit MImSettingsBackend(QObject *parent = nullptr);
 
     /*! Finalizes a MImSettingsBackend.
      */

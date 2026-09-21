@@ -1,0 +1,36 @@
+{
+    "com.webos.service.ime*": [
+        "application.launcher",
+        "application.operation",
+        "audio.management",
+        "audio.operation",
+        "audio.query",
+        "bluetooth.query",
+        "notification.operation",
+        "settings.query",
+        "systemconfig.query",
+        "systemsettings.management",
+        "systemsettings.query",
+        "tts.operation"
+    ],
+    "org.maliit": [
+        "application.launcher",
+        "application.operation",
+        "audio.management",
+        "audio.operation",
+        "audio.query",
+        "bluetooth.query",
+        "notification.operation",
+        "settings.query",
+        "systemconfig.query",
+        "systemsettings.management",
+        "systemsettings.query",
+        "tts.operation"
+    ],
+    "org.webosports.keyboard.dictionary": [
+        "database.operation"
+    ],
+    "org.webosports.presage.dictionary": [
+        "database.operation"
+    ]
+}

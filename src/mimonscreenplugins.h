@@ -38,7 +38,7 @@ public:
 
         explicit SubView();
         explicit SubView(const QString &new_plugin,
-                         const QString &new_id = NULL);
+                         const QString &new_id = QString());
 
         bool operator==(const SubView &other) const;
     };

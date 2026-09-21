@@ -11,13 +11,15 @@
 
 #include "maliit/settingdata.h"
 
+#include <QMetaType>
+
 namespace
 {
     bool checkValueDomain(const QVariant &value, const QVariant &domain)
     {
         if (!domain.isValid())
             return true;
-        if (!domain.canConvert(QVariant::List))
+        if (!domain.canConvert<QVariantList>())
             return false;
 
         QVariantList domain_values = domain.toList();
@@ -30,17 +32,24 @@ namespace
         if (!range_min.isValid() && !range_max.isValid())
             return true;
 
+        // canConvert<int>() answers "is there a conversion", not "does this
+        // value have one": every QString says yes and then converts to 0. A
+        // bound of "low" therefore used to read as a minimum of zero rather
+        // than as the malformed attribute it is. Ask for the conversion.
+        bool ok = false;
+        const int intValue = value.toInt(&ok);
+        if (!ok)
+            return false;
+
         if (range_min.isValid()) {
-            if (!range_min.canConvert(QVariant::Int))
-                return false;
-            if (range_min.toInt() > value.toInt())
+            const int minimum = range_min.toInt(&ok);
+            if (!ok || minimum > intValue)
                 return false;
         }
 
         if (range_max.isValid()) {
-            if (!range_max.canConvert(QVariant::Int))
-                return false;
-            if (range_max.toInt() < value.toInt())
+            const int maximum = range_max.toInt(&ok);
+            if (!ok || maximum < intValue)
                 return false;
         }
 
@@ -51,7 +60,7 @@ namespace
     {
         if (!domain.isValid())
             return true;
-        if (!domain.canConvert(QVariant::List))
+        if (!domain.canConvert<QVariantList>())
             return false;
 
         const QVariantList &domain_values = domain.toList();
@@ -77,8 +86,14 @@ namespace
 
     bool checkIntList(const QVariant &value)
     {
-        if (!value.canConvert<QVariantList>())
+        // A scalar converts to an empty QVariantList rather than failing, so
+        // testing convertibility would accept, say, the string "1,2,3" as an
+        // int list that happens to have no elements - and every element check
+        // below would then pass vacuously. Require an actual list.
+        if (value.typeId() != QMetaType::QVariantList
+            && value.typeId() != QMetaType::QStringList) {
             return false;
+        }
 
         const QVariantList &values = value.toList();
 
@@ -86,7 +101,7 @@ namespace
         {
             QVariant copy = v;
 
-            if (!v.canConvert<int>() || !copy.convert(QVariant::Int))
+            if (!v.canConvert<int>() || !copy.convert(QMetaType::fromType<int>()))
                 return false;
         }
 
@@ -94,6 +109,12 @@ namespace
     }
 }
 
+// Takes the map by value to match the declaration in the installed
+// maliit/settingdata.h. Passing it by reference would be cheaper, but the
+// header is public API: changing the signature breaks every out-of-tree
+// plugin that links against it, which is not a trade worth making for a
+// validator called once per settings write.
+// NOLINTNEXTLINE(performance-unnecessary-value-param)
 bool validateSettingValue(Maliit::SettingEntryType type, const QVariantMap attributes, const QVariant &value)
 {
     QVariant domain = attributes[Maliit::SettingEntryAttributes::valueDomain];
@@ -110,7 +131,7 @@ bool validateSettingValue(Maliit::SettingEntryType type, const QVariantMap attri
             return false;
         break;
     case Maliit::IntType:
-        if (!value.canConvert<int>() || !copy.convert(QVariant::Int))
+        if (!value.canConvert<int>() || !copy.convert(QMetaType::fromType<int>()))
             return false;
         if (!checkValueDomain(value, domain))
             return false;

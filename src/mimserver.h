@@ -48,7 +48,7 @@ public:
 public:
     explicit MImServer(const QSharedPointer<MInputContextConnection> &icConnection,
                        const QSharedPointer<Maliit::AbstractPlatform> &platform,
-                       QObject *parent = 0);
+                       QObject *parent = nullptr);
     ~MImServer();
 
     static void configureSettings(MImServer::SettingsType settingsType);

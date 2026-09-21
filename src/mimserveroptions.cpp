@@ -16,10 +16,11 @@
 
 #include "mimserveroptions.h"
 
-#include <stdio.h>
-#include <string.h>
+#include <cstdio>
+#include <cstring>
 
 #include <QtGlobal>
+#include <QDebug>
 #include <QList>
 #include <QExplicitlySharedDataPointer>
 #include <QSharedData>
@@ -64,6 +65,8 @@ namespace {
     {
         MImServerOptionsParserBase(void *options);
 
+        // QSharedData has no virtual destructor of its own; this declares
+        // one, so the parsers can be deleted through a base pointer.
         virtual ~MImServerOptionsParserBase();
 
         //! Result of parameter parsing
@@ -98,11 +101,11 @@ namespace {
         void *serverOptions;
     };
 
-    typedef QExplicitlySharedDataPointer<MImServerOptionsParserBase> ParserBasePtr;
+    using ParserBasePtr = QExplicitlySharedDataPointer<MImServerOptionsParserBase>;
     QList<ParserBasePtr> parsers;
 
     //! Unregister parser associated with given \a options.
-    void unregisterParser(void *options)
+    void unregisterParser(const void *options)
     {
         QList<ParserBasePtr>::iterator iterator = parsers.begin();
         while (iterator != parsers.end()) {
@@ -117,13 +120,13 @@ namespace {
      //! \brief Parser of common command line parameters
     struct MImServerCommonOptionsParser : public MImServerOptionsParserBase
     {
-        MImServerCommonOptionsParser(MImServerCommonOptions *options);
+        explicit MImServerCommonOptionsParser(MImServerCommonOptions *options);
 
         //! \reimp
-        virtual ParsingResult parseParameter(const char * parameter,
-                                             const char * next,
-                                             int *argumentCount);
-        virtual void printAvailableOptions(const char *format);
+        ParsingResult parseParameter(const char * parameter,
+                                     const char * next,
+                                     int *argumentCount) override;
+        void printAvailableOptions(const char *format) override;
         //! \reimp_end
 
     private:
@@ -140,13 +143,13 @@ namespace {
          * when application will exit, so it is recommnded to create it in main().
          * \note It does not makes sense tp create more than one object of this class.
          */
-        MImServerConnectionOptionsParser(MImServerConnectionOptions *options);
+        explicit MImServerConnectionOptionsParser(MImServerConnectionOptions *options);
 
         //! \reimp
-        virtual ParsingResult parseParameter(const char * parameter,
-                                             const char * next,
-                                             int *argumentCount);
-        virtual void printAvailableOptions(const char *format);
+        ParsingResult parseParameter(const char * parameter,
+                                     const char * next,
+                                     int *argumentCount) override;
+        void printAvailableOptions(const char *format) override;
         //! \reimp_end
 
     private:
@@ -161,13 +164,13 @@ namespace {
 
     struct MImServerIgnoredOptionsParser : public MImServerOptionsParserBase
     {
-        MImServerIgnoredOptionsParser(MImServerIgnoredOptions *options);
+        explicit MImServerIgnoredOptionsParser(MImServerIgnoredOptions *options);
 
         //! \reimp
-        virtual ParsingResult parseParameter(const char * parameter,
-                                             const char * next,
-                                             int *argumentCount);
-        virtual void printAvailableOptions(const char *format);
+        ParsingResult parseParameter(const char * parameter,
+                                     const char * next,
+                                     int *argumentCount) override;
+        void printAvailableOptions(const char *format) override;
         //! \reimp_end
     };
 
@@ -186,9 +189,7 @@ MImServerOptionsParserBase::MImServerOptionsParserBase(void *options)
 {
 }
 
-MImServerOptionsParserBase::~MImServerOptionsParserBase()
-{
-}
+MImServerOptionsParserBase::~MImServerOptionsParserBase() = default;
 
 void* MImServerOptionsParserBase::options() const
 {
@@ -205,7 +206,7 @@ bool parseCommandLine(int argc, const char * const * argv)
 
     for (int n = 1; n < argc; ++n) {
         const char * const parameter = argv[n];
-        const char * const next = (n < argc - 1) ? argv[n + 1] : 0;
+        const char * const next = (n < argc - 1) ? argv[n + 1] : nullptr;
         MImServerOptionsParserBase::ParsingResult parsingResult = MImServerOptionsParserBase::Invalid;
 
         Q_FOREACH (const ParserBasePtr &base, parsers) {
@@ -218,7 +219,10 @@ bool parseCommandLine(int argc, const char * const * argv)
         }
 
         if (parsingResult == MImServerOptionsParserBase::Invalid) {
-            fprintf(stderr, "Invalid parameter '%s'\n", argv[n]);
+            if (fprintf(stderr, "Invalid parameter '%s'\n", argv[n]) < 0) {
+                qDebug() << "failed to send formatted output to stream";
+                return false;
+            }
             allRecognized = false;
         }
     }
@@ -228,8 +232,14 @@ bool parseCommandLine(int argc, const char * const * argv)
 
 void printHelpMessage()
 {
-    fprintf(stderr, "\nUsage: %s [options]\n", programName);
-    fprintf(stderr, "Available options:\n");
+    if (fprintf(stderr, "\nUsage: %s [options]\n", programName) < 0) {
+        qDebug() << "failed to send formatted output to stream";
+        return;
+    }
+    if (fprintf(stderr, "Available options:\n") < 0) {
+        qDebug() << "failed to send formatted output to stream";
+        return;
+    }
 
     Q_FOREACH (const ParserBasePtr &base, parsers) {
         base->printAvailableOptions(HelpFormat);
@@ -249,7 +259,7 @@ MImServerIgnoredOptionsParser::MImServerIgnoredOptionsParser(MImServerIgnoredOpt
 
 MImServerOptionsParserBase::ParsingResult
 MImServerIgnoredOptionsParser::parseParameter(const char *parameter,
-                                              const char *,
+                                              const char * /*next*/,
                                               int *argumentCount)
 {
     const int count = sizeof(IgnoredParameters) / sizeof(IgnoredParameters[0]);
@@ -267,7 +277,7 @@ MImServerIgnoredOptionsParser::parseParameter(const char *parameter,
     return result;
 }
 
-void MImServerIgnoredOptionsParser::printAvailableOptions(const char *)
+void MImServerIgnoredOptionsParser::printAvailableOptions(const char * /*format*/)
 {
     // nothing to print
 }
@@ -293,7 +303,7 @@ MImServerCommonOptionsParser::MImServerCommonOptionsParser(MImServerCommonOption
 
 MImServerOptionsParserBase::ParsingResult
 MImServerCommonOptionsParser::parseParameter(const char *parameter,
-                                             const char *,
+                                             const char * /*next*/,
                                              int *argumentCount)
 {
     *argumentCount = 0;
@@ -309,7 +319,8 @@ MImServerCommonOptionsParser::parseParameter(const char *parameter,
 
 void MImServerCommonOptionsParser::printAvailableOptions(const char *format)
 {
-    fprintf(stderr, format, "-help", "Show usage information");
+    if (fprintf(stderr, format, "-help", "Show usage information") < 0)
+        qDebug() << "failed to send formatted output to stream";
 }
 
 MImServerCommonOptions::MImServerCommonOptions()
@@ -338,6 +349,8 @@ MImServerConnectionOptionsParser::parseParameter(const char *parameter,
     const int count = sizeof(AvailableConnectionParameters) / sizeof(AvailableConnectionParameters[0]);
     ParsingResult result = Invalid;
 
+    *argumentCount = 0;
+
     for (int i = 0; i < count; ++i) {
         const char * const availableParameter = AvailableConnectionParameters[i].name;
 
@@ -351,14 +364,20 @@ MImServerConnectionOptionsParser::parseParameter(const char *parameter,
                     storage->instanceId = param.toInt();
                     *argumentCount = 1;
                 } else {
-                    fprintf(stderr, "ERROR: No argument passed to -instance\n");
+                    if (fprintf(stderr, "ERROR: No argument passed to -instance\n") < 0) {
+                        qDebug() << "failed to send formatted output to stream";
+                        return Invalid;
+                    }
                     *argumentCount = 0;
                 }
             } else if (!strcmp(parameter, "-no-ls2-service")) {
                 storage->noLS2Service = true;
                 *argumentCount = 0;
             } else {
-                fprintf(stderr, "ERROR: connection option %s declared but unhandled\n", parameter);
+                if (fprintf(stderr, "ERROR: connection option %s declared but unhandled\n", parameter) < 0) {
+                    qDebug() << "failed to send formatted output to stream";
+                    return Invalid;
+                }
             }
 
             break;
@@ -374,8 +393,10 @@ void MImServerConnectionOptionsParser::printAvailableOptions(const char *format)
 
     for (int i = 0; i < count; ++i) {
         if (AvailableConnectionParameters[i].description) {
-            fprintf(stderr, format, AvailableConnectionParameters[i].name,
-                    AvailableConnectionParameters[i].description);
+            if (fprintf(stderr, format, AvailableConnectionParameters[i].name, AvailableConnectionParameters[i].description) < 0) {
+                qDebug() << "failed to send formatted output to stream";
+                return;
+            }
         }
     }
 }

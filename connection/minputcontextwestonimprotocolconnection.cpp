@@ -13,6 +13,7 @@
  */
 
 #include <cerrno> // for errno
+#include <climits> // for INT_MAX, UINT_MAX, USHRT_MAX
 #include <cstring> // for strerror
 #include <unistd.h> // for close
 #include <QGuiApplication>
@@ -31,6 +32,7 @@
 #include <sys/mman.h>
 #include <xkbcommon/xkbcommon.h>
 
+#include "mimxkbmodifiers.h"
 #include "minputcontextwestonimprotocolconnection.h"
 
 namespace {
@@ -58,7 +60,7 @@ struct XkbQtKey
     int qtkey;
 };
 
-static const struct XkbQtKey g_XkbQtKeyMap[] = {
+const struct XkbQtKey g_XkbQtKeyMap[] = {
     { XKB_KEY_Shift_L,     Qt::Key_Shift },
     { XKB_KEY_Control_L,   Qt::Key_Control },
     { XKB_KEY_Super_L,     Qt::Key_Super_L },
@@ -222,7 +224,7 @@ static const struct XkbQtKey g_XkbQtKeyMap[] = {
     { XKB_KEY_Cancel,      Qt::Key_MediaStop },
 };
 
-static const struct XkbQtKey g_XkbQtKeypadMap[] = {
+const struct XkbQtKey g_XkbQtKeypadMap[] = {
     { XKB_KEY_KP_Divide,   Qt::Key_Slash },
     { XKB_KEY_KP_Multiply, Qt::Key_Asterisk },
     { XKB_KEY_KP_Subtract, Qt::Key_Minus },
@@ -266,7 +268,7 @@ static const struct XkbQtKey g_XkbQtKeypadMap[] = {
     { Qt::Key_9,           Qt::Key_9 },
 };
 
-static const struct XkbQtKey g_XkbQtMediaMap[] = {
+const struct XkbQtKey g_XkbQtMediaMap[] = {
     { XKB_KEY_XF86AudioPlay, Qt::Key_MediaPlay },
     { Qt::Key_MediaPlay,     Qt::Key_MediaPlay },
     { XKB_KEY_XF86AudioStop, Qt::Key_MediaStop },
@@ -284,7 +286,7 @@ static const struct XkbQtKey g_XkbQtMediaMap[] = {
     { Qt::Key_AudioForward,     Qt::Key_AudioForward },
 };
 
-static xkb_keysym_t qtKeyToXkbKey(int qtkey)
+xkb_keysym_t qtKeyToXkbKey(int qtkey)
 {
     unsigned i;
 
@@ -304,7 +306,7 @@ static xkb_keysym_t qtKeyToXkbKey(int qtkey)
     return (xkb_keysym_t)qtkey;
 }
 
-static int xkbKeyToQtKey(xkb_keysym_t xkbkey)
+int xkbKeyToQtKey(xkb_keysym_t xkbkey)
 {
     unsigned i;
 
@@ -324,7 +326,7 @@ static int xkbKeyToQtKey(xkb_keysym_t xkbkey)
     return (int)xkbkey;
 }
 
-static bool isKeypadKey(xkb_keysym_t xkbkey)
+bool isKeypadKey(xkb_keysym_t xkbkey)
 {
     unsigned i;
     for (i = 0; i < sizeof(g_XkbQtKeypadMap) / sizeof(XkbQtKey); i++) {
@@ -437,7 +439,9 @@ struct MInputContextWestonIMProtocolConnectionPrivate
     void handleInputMethodContextMaxTextLength(uint32_t maxLength);
     void handleInputMethodContextPlatformData(const char *pattern);
 
-    void processKeyMap(uint32_t format, uint32_t fd, uint32_t size);
+    void releaseInputMethodContext();
+
+    void processKeyMap(uint32_t format, int fd, uint32_t size);
     void processKeyEvent(uint32_t serial, uint32_t time, uint32_t key, uint32_t state);
     void processKeyModifiers(uint32_t serial, uint32_t mods_depressed, uint32_t
             mods_latched, uint32_t mods_locked, uint32_t group);
@@ -447,6 +451,7 @@ struct MInputContextWestonIMProtocolConnectionPrivate
     wl_registry *registry;
     input_method *im;
     input_method_context *im_context;
+    wl_keyboard *im_keyboard;
     uint32_t im_serial;
     QString selection;
     Modifiers mods;
@@ -457,14 +462,14 @@ struct MInputContextWestonIMProtocolConnectionPrivate
         xkb_keymap *keymap = nullptr;
         xkb_state *state = nullptr;
 
-        xkb_mod_index_t shift_mod = 0;
-        xkb_mod_index_t caps_mod = 0;
-        xkb_mod_index_t ctrl_mod = 0;
-        xkb_mod_index_t alt_mod = 0;
-        xkb_mod_index_t mod2_mod = 0;
-        xkb_mod_index_t mod3_mod = 0;
-        xkb_mod_index_t super_mod = 0;
-        xkb_mod_index_t mod5_mod = 0;
+        xkb_mod_index_t shift_mod = XKB_MOD_INVALID;
+        xkb_mod_index_t caps_mod = XKB_MOD_INVALID;
+        xkb_mod_index_t ctrl_mod = XKB_MOD_INVALID;
+        xkb_mod_index_t alt_mod = XKB_MOD_INVALID;
+        xkb_mod_index_t mod2_mod = XKB_MOD_INVALID;
+        xkb_mod_index_t mod3_mod = XKB_MOD_INVALID;
+        xkb_mod_index_t super_mod = XKB_MOD_INVALID;
+        xkb_mod_index_t mod5_mod = XKB_MOD_INVALID;
         xkb_led_index_t num_led = 0;
         xkb_led_index_t caps_led = 0;
         xkb_led_index_t scroll_led = 0;
@@ -768,14 +773,13 @@ bool matchesFlag(int value,
 
 MInputContextWestonIMProtocolConnectionPrivate::MInputContextWestonIMProtocolConnectionPrivate(MInputContextWestonIMProtocolConnection *connection)
     : q_ptr(connection),
-      display(0),
-      registry(0),
-      im(0),
-      im_context(0),
+      display(nullptr),
+      registry(nullptr),
+      im(nullptr),
+      im_context(nullptr),
+      im_keyboard(nullptr),
       im_serial(0),
-      selection(),
-      mods(),
-      state_info(),
+
       m_displayId(-1)
 {
     display = static_cast<wl_display *>(QGuiApplication::platformNativeInterface()->nativeResourceForIntegration("display"));
@@ -790,11 +794,22 @@ MInputContextWestonIMProtocolConnectionPrivate::MInputContextWestonIMProtocolCon
     xkb.context = xkb_context_new(XKB_CONTEXT_NO_DEFAULT_INCLUDES);
 }
 
-MInputContextWestonIMProtocolConnectionPrivate::~MInputContextWestonIMProtocolConnectionPrivate()
+void MInputContextWestonIMProtocolConnectionPrivate::releaseInputMethodContext()
 {
+    // The keyboard is grabbed through the context, so it has to go first.
+    if (im_keyboard) {
+        wl_keyboard_destroy(im_keyboard);
+        im_keyboard = nullptr;
+    }
     if (im_context) {
         input_method_context_destroy(im_context);
+        im_context = nullptr;
     }
+}
+
+MInputContextWestonIMProtocolConnectionPrivate::~MInputContextWestonIMProtocolConnectionPrivate()
+{
+    releaseInputMethodContext();
     if (im) {
         input_method_destroy(im);
     }
@@ -827,6 +842,10 @@ void MInputContextWestonIMProtocolConnectionPrivate::handleRegistryGlobal(uint32
     if (!strcmp(interface, "input_method")) {
         im = static_cast<input_method *>(wl_registry_bind(registry, name, &input_method_interface, 2));
         input_method_add_listener(im, &maliit_input_method_listener, this);
+        if (m_displayId < 0 || m_displayId > USHRT_MAX) {
+            qWarning() << "This conversion from int to ushort may result in data lost, because the value exceeds USHRT_MAX. Before: " << m_displayId << ", After: " << USHRT_MAX;
+            return;
+        }
         input_method_set_display_id(im, m_displayId);
     }
 }
@@ -848,10 +867,17 @@ inputMethodKeyboardKeyMap(void *data,
     MInputContextWestonIMProtocolConnectionPrivate *d =
         static_cast<MInputContextWestonIMProtocolConnectionPrivate *>(data);
 
+    if (fd < 0) {
+        qWarning() << "Compositor sent an invalid keymap fd:" << fd;
+        return;
+    }
+    // processKeyMap() takes ownership of the fd and closes it on every path.
     d->processKeyMap(format, fd, size);
 }
 
-static void
+namespace {
+
+void
 inputMethodKeyboardKey(void *data,
                        struct wl_keyboard *wl_keyboard,
                        uint32_t serial,
@@ -867,7 +893,7 @@ inputMethodKeyboardKey(void *data,
     d->processKeyEvent(serial, time, key, state_w);
 }
 
-static void
+void
 inputMethodKeyboardModifiers(void *data,
                        struct wl_keyboard *wl_keyboard,
                        uint32_t serial,
@@ -884,57 +910,79 @@ inputMethodKeyboardModifiers(void *data,
     d->processKeyModifiers(serial, mods_depressed, mods_latched, mods_locked, group);
 }
 
+} // namespace
+
 const wl_keyboard_listener input_method_keyboard_listener = {
     inputMethodKeyboardKeyMap,
-    NULL, /* enter */
-    NULL, /* leave */
+    nullptr, /* enter */
+    nullptr, /* leave */
     inputMethodKeyboardKey,
     inputMethodKeyboardModifiers,
-    NULL  /* repeat_info */
+    nullptr  /* repeat_info */
 };
 
-void MInputContextWestonIMProtocolConnectionPrivate::processKeyMap(uint32_t format, uint32_t fd, uint32_t size)
+void MInputContextWestonIMProtocolConnectionPrivate::processKeyMap(uint32_t format, int fd, uint32_t size)
 {
-    if (format == WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1) {
-        char *keymapArea = static_cast<char*>(mmap(NULL, size, PROT_READ, MAP_SHARED, fd, 0));
-        if (keymapArea == MAP_FAILED) {
-            close(fd);
-            qWarning() << "failed to mmap() " << (unsigned long) size << " bytes\n";
-            return;
-        }
-
-        xkb_keymap *newKeymap = xkb_keymap_new_from_string(xkb.context,
-                keymapArea, XKB_KEYMAP_FORMAT_TEXT_V1,
-                XKB_MAP_COMPILE_PLACEHOLDER);
-
-        munmap(keymapArea, size);
+    // The fd is ours from here on: the wl_keyboard.keymap event hands the
+    // receiver a descriptor it is responsible for closing, whatever it then
+    // does with the contents.
+    if (format != WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1) {
+        qWarning() << "Ignoring keymap in unsupported format" << format;
         close(fd);
-
-        // free existing keymap
-        if (xkb.keymap) {
-            xkb_keymap_unref(xkb.keymap);
-        }
-        xkb.keymap = newKeymap;
-
-        if (xkb.state) {
-            xkb_state_unref(xkb.state);
-        }
-        xkb.state = xkb_state_new(xkb.keymap);
-
-        // set modifier index
-        xkb.shift_mod = xkb_map_mod_get_index(xkb.keymap, XKB_MOD_NAME_SHIFT);
-        xkb.caps_mod = xkb_map_mod_get_index(xkb.keymap, XKB_MOD_NAME_CAPS);
-        xkb.ctrl_mod = xkb_map_mod_get_index(xkb.keymap, XKB_MOD_NAME_CTRL);
-        xkb.alt_mod = xkb_map_mod_get_index(xkb.keymap, XKB_MOD_NAME_ALT);
-        xkb.mod2_mod = xkb_map_mod_get_index(xkb.keymap, "Mod2");
-        xkb.mod3_mod = xkb_map_mod_get_index(xkb.keymap, "Mod3");
-        xkb.super_mod = xkb_map_mod_get_index(xkb.keymap, XKB_MOD_NAME_LOGO);
-        xkb.mod5_mod = xkb_map_mod_get_index(xkb.keymap, "Mod5");
-
-        xkb.num_led = xkb_map_led_get_index(xkb.keymap, XKB_LED_NAME_NUM);
-        xkb.caps_led = xkb_map_led_get_index(xkb.keymap, XKB_LED_NAME_CAPS);
-        xkb.scroll_led = xkb_map_led_get_index(xkb.keymap, XKB_LED_NAME_SCROLL);
+        return;
     }
+
+    if (!xkb.context) {
+        qWarning() << "no xkb context, cannot use the keymap";
+        close(fd);
+        return;
+    }
+
+    char *keymapArea = static_cast<char*>(mmap(nullptr, size, PROT_READ, MAP_SHARED, fd, 0));
+    if (keymapArea == MAP_FAILED) {
+        close(fd);
+        qWarning() << "failed to mmap() " << (unsigned long) size << " bytes\n";
+        return;
+    }
+
+    xkb_keymap *newKeymap = xkb_keymap_new_from_string(xkb.context,
+            keymapArea, XKB_KEYMAP_FORMAT_TEXT_V1,
+            XKB_MAP_COMPILE_PLACEHOLDER);
+
+    munmap(keymapArea, size);
+    close(fd);
+
+    if (!newKeymap) {
+        // Keep the keymap and state we already have rather than dropping
+        // to a null xkb_state that every key event would then dereference.
+        qWarning() << "failed to compile the keymap sent by the compositor";
+        return;
+    }
+
+    // free existing keymap
+    if (xkb.keymap) {
+        xkb_keymap_unref(xkb.keymap);
+    }
+    xkb.keymap = newKeymap;
+
+    if (xkb.state) {
+        xkb_state_unref(xkb.state);
+    }
+    xkb.state = xkb_state_new(xkb.keymap);
+
+    // set modifier index
+    xkb.shift_mod = xkb_map_mod_get_index(xkb.keymap, XKB_MOD_NAME_SHIFT);
+    xkb.caps_mod = xkb_map_mod_get_index(xkb.keymap, XKB_MOD_NAME_CAPS);
+    xkb.ctrl_mod = xkb_map_mod_get_index(xkb.keymap, XKB_MOD_NAME_CTRL);
+    xkb.alt_mod = xkb_map_mod_get_index(xkb.keymap, XKB_MOD_NAME_ALT);
+    xkb.mod2_mod = xkb_map_mod_get_index(xkb.keymap, "Mod2");
+    xkb.mod3_mod = xkb_map_mod_get_index(xkb.keymap, "Mod3");
+    xkb.super_mod = xkb_map_mod_get_index(xkb.keymap, XKB_MOD_NAME_LOGO);
+    xkb.mod5_mod = xkb_map_mod_get_index(xkb.keymap, "Mod5");
+
+    xkb.num_led = xkb_map_led_get_index(xkb.keymap, XKB_LED_NAME_NUM);
+    xkb.caps_led = xkb_map_led_get_index(xkb.keymap, XKB_LED_NAME_CAPS);
+    xkb.scroll_led = xkb_map_led_get_index(xkb.keymap, XKB_LED_NAME_SCROLL);
 }
 
 struct RemoteKeysym {
@@ -964,7 +1012,9 @@ static const struct RemoteKeysym g_RemoteKeysymMap[] = {
     { KEY_NUMERIC_9, XKB_KEY_9 },
 };
 
-static xkb_keysym_t get_remote_keysym(uint32_t key)
+namespace {
+
+xkb_keysym_t get_remote_keysym(uint32_t key)
 {
     for (unsigned i = 0; i < sizeof(g_RemoteKeysymMap) / sizeof(RemoteKeysym); i++) {
         if (key == g_RemoteKeysymMap[i].key)
@@ -972,6 +1022,8 @@ static xkb_keysym_t get_remote_keysym(uint32_t key)
     }
     return XKB_KEY_NoSymbol;
 }
+
+} // namespace
 
 #ifdef HAS_LIBIM
 struct LGRemoteKey {
@@ -1092,7 +1144,7 @@ void MInputContextWestonIMProtocolConnectionPrivate::processKeyEvent(uint32_t se
         return;
     }
 
-    const int EVDEV_OFFSET = 8;
+    const uint32_t EVDEV_OFFSET = 8;
 
     QEvent::Type keyType = (state == WL_KEYBOARD_KEY_STATE_RELEASED ? QEvent::KeyRelease : QEvent::KeyPress);
 #ifdef HAS_LIBIM
@@ -1100,11 +1152,18 @@ void MInputContextWestonIMProtocolConnectionPrivate::processKeyEvent(uint32_t se
 #endif
 
     const xkb_keysym_t *syms;
-    int num_syms = xkb_key_get_syms(xkb.state, key + EVDEV_OFFSET, &syms);
+    if (UINT_MAX - key < EVDEV_OFFSET) {
+        qWarning() << "Sum EVDEV_OFFSET and key value exceeds UINT_MAX. Before: " << key + EVDEV_OFFSET << ", After: " << UINT_MAX;
+        return;
+    }
 
     xkb_keysym_t sym = XKB_KEY_NoSymbol;
-    if (1 == num_syms)
-        sym = syms[0];
+    if (xkb.state) {
+        int num_syms = xkb_key_get_syms(xkb.state, key + EVDEV_OFFSET, &syms);
+
+        if (1 == num_syms)
+            sym = syms[0];
+    }
     // TODO: multiple key press?
 
     // Check keysym mapping for RC buttons
@@ -1113,31 +1172,41 @@ void MInputContextWestonIMProtocolConnectionPrivate::processKeyEvent(uint32_t se
 
     int keyCode = xkbKeyToQtKey(sym);
 
+    // Per-event, not folded into the member: the compositor only sends
+    // wl_keyboard.modifiers when a real modifier changes, so setting the bit
+    // on "modifiers" left it stuck on every subsequent key until then.
+    Qt::KeyboardModifiers eventModifiers = modifiers;
     if (isKeypadKey(sym))
-        modifiers |= Qt::KeypadModifier;
+        eventModifiers |= Qt::KeypadModifier;
 
+    // Hand the plugins the character the key actually produces, for every
+    // printable keysym rather than just the plain latin letters. Digits and
+    // punctuation used to arrive with an empty text, which left plugins no way
+    // to tell what was typed. Control characters (Return, Tab, Backspace,
+    // Escape, ...) keep an empty text so they stay recognisable as function
+    // keys.
     QString text("");
-    if ((XKB_KEY_A <= sym && sym <= XKB_KEY_Z) ||
-        (XKB_KEY_a <= sym && sym <= XKB_KEY_z)) {
-        text.append(QChar(sym));
+    const char32_t codepoint = xkb_keysym_to_utf32(sym);
+    if (codepoint >= 0x20 && codepoint != 0x7f) {
+        text = QString::fromUcs4(&codepoint, 1);
     }
 
 #ifdef HAS_LIBIM
     if (is_lgremote_numbersign(key)) {
         // # = shift + 3
         q->processKeyEvent(connection_id, keyType, Qt::Key_NumberSign,
-                modifiers | Qt::ShiftModifier, text,
+                eventModifiers | Qt::ShiftModifier, text,
                 false, 0, KEY_3 + EVDEV_OFFSET, 0, time);
     } else if (is_lgremote_asterisk(key)) {
         // * = shift + 8
         q->processKeyEvent(connection_id, keyType, Qt::Key_Asterisk,
-                modifiers | Qt::ShiftModifier, text,
+                eventModifiers | Qt::ShiftModifier, text,
                 false, 0, KEY_8 + EVDEV_OFFSET, 0, time);
     } else
 #endif
     {
         q->processKeyEvent(connection_id, keyType, static_cast<Qt::Key>(keyCode),
-                modifiers, text,
+                eventModifiers, text,
                 false, 0, key + EVDEV_OFFSET, 0, time);
     }
 }
@@ -1148,14 +1217,16 @@ void MInputContextWestonIMProtocolConnectionPrivate::processKeyModifiers(uint32_
 
     uint32_t mods_lookup = mods_depressed | mods_latched;
     modifiers = Qt::NoModifier;
-    if (mods_lookup & (1 << xkb.ctrl_mod))
+    if (Maliit::xkbModifierIsSet(mods_lookup, xkb.ctrl_mod))
         modifiers |= Qt::ControlModifier;
-    if (mods_lookup & (1 << xkb.alt_mod))
+    if (Maliit::xkbModifierIsSet(mods_lookup, xkb.alt_mod))
         modifiers |= Qt::AltModifier;
-    if (mods_lookup & (1 << xkb.shift_mod))
+    if (Maliit::xkbModifierIsSet(mods_lookup, xkb.shift_mod))
         modifiers |= Qt::ShiftModifier;
 
-    xkb_state_update_mask(xkb.state, mods_depressed, mods_latched, mods_locked, 0, 0, group);
+    if (xkb.state) {
+        xkb_state_update_mask(xkb.state, mods_depressed, mods_latched, mods_locked, 0, 0, group);
+    }
 }
 
 void MInputContextWestonIMProtocolConnectionPrivate::handleInputMethodActivate(input_method_context *context,
@@ -1164,15 +1235,19 @@ void MInputContextWestonIMProtocolConnectionPrivate::handleInputMethodActivate(i
     Q_Q(MInputContextWestonIMProtocolConnection);
 
     qDebug() << "context:" << (long) context << "serial:" << serial;
-    if (im_context) {
-        input_method_context_destroy(im_context);
-    }
+    releaseInputMethodContext();
     im_context = context;
     im_serial = serial;
     input_method_context_add_listener(im_context, &maliit_input_method_context_listener, this);
 
-    wl_keyboard *keyboard = input_method_context_grab_keyboard(im_context);
-    wl_keyboard_add_listener(keyboard, &input_method_keyboard_listener, this);
+    // Held in im_keyboard so it is destroyed along with the context; without
+    // that every activate/deactivate cycle left a wl_keyboard proxy behind.
+    im_keyboard = input_method_context_grab_keyboard(im_context);
+    if (im_keyboard) {
+        wl_keyboard_add_listener(im_keyboard, &input_method_keyboard_listener, this);
+    } else {
+        qWarning() << "failed to grab the keyboard for this input method context";
+    }
 
     input_method_context_modifiers_map(im_context, mods.getModMap());
 
@@ -1215,8 +1290,7 @@ void MInputContextWestonIMProtocolConnectionPrivate::handleInputMethodDeactivate
     if (!im_context) {
         return;
     }
-    input_method_context_destroy(im_context);
-    im_context = NULL;
+    releaseInputMethodContext();
     state_info.clear();
     state_info[FocusStateAttribute] = false;
     q->updateWidgetInformation(connection_id, state_info, true);
@@ -1232,8 +1306,26 @@ void MInputContextWestonIMProtocolConnectionPrivate::handleInputMethodContextSur
 
     qDebug() << "text:" << text << "cursor:" << cursor << "anchor:" << anchor;
 
-    int len = strlen(text);
+    if (!text) {
+        qWarning() << "surrounding text event without any text";
+        return;
+    }
+
+    unsigned long textlen = strlen(text);
+    if (textlen > INT_MAX) {
+        qWarning() << "This conversion from unsigned long to int may result in data lost, because the value exceeds INT_MAX. Before: " << textlen << ", After: " << INT_MAX;
+        return;
+    }
+    int len = (int) textlen;
+    if (cursor > INT_MAX) {
+        qWarning() << "This conversion from unsigned int to int may result in data lost, because the value exceeds INT_MAX. Before: " << cursor << ", After: " << INT_MAX;
+        return;
+    }
     cursor = len < (int) cursor ? len : cursor;
+    if (anchor > INT_MAX) {
+        qWarning() << "This conversion from unsigned int to int may result in data lost, because the value exceeds INT_MAX. Before: " << anchor << ", After: " << INT_MAX;
+        return;
+    }
     anchor = len < (int) anchor ? len : anchor;
 
     state_info[SurroundingTextAttribute] = QString(text);
@@ -1246,6 +1338,10 @@ void MInputContextWestonIMProtocolConnectionPrivate::handleInputMethodContextSur
         uint32_t begin(qMin(cursor, anchor));
         uint32_t end(qMax(cursor, anchor));
 
+        if (INT_MAX - end < begin) {
+            qWarning() << "Sum begin and end value exceeds INT_MAX. Before: " << begin + end << ", After: " << INT_MAX;
+            return;
+        }
         selection = QString::fromUtf8(text + begin, end - begin);
     }
     q->updateWidgetInformation(connection_id, state_info, false);
@@ -1267,7 +1363,15 @@ void MInputContextWestonIMProtocolConnectionPrivate::handleInputMethodContextCon
 
     qDebug() << "hint:" << hint << "purpose:" << purpose;
 
+    if (purpose > INT_MAX) {
+        qWarning() << "This conversion from unsigned int to int may result in data lost, because the value exceeds INT_MAX. Before: " << purpose << ", After: " << INT_MAX;
+        return;
+    }
     state_info[ContentTypeAttribute] = westonPurposeToMaliit(static_cast<text_model_content_purpose>(purpose));
+    if (hint > INT_MAX) {
+        qWarning() << "This conversion from unsigned int to int may result in data lost, because the value exceeds INT_MAX. Before: " << hint << ", After: " << INT_MAX;
+        return;
+    }
     state_info[AutoCapitalizationAttribute] = matchesFlag(hint, TEXT_MODEL_CONTENT_HINT_AUTO_CAPITALIZATION);
     state_info[CorrectionAttribute] = matchesFlag(hint, TEXT_MODEL_CONTENT_HINT_AUTO_CORRECTION);
     state_info[PredictionAttribute] = matchesFlag(hint, TEXT_MODEL_CONTENT_HINT_AUTO_COMPLETION);
@@ -1285,6 +1389,10 @@ void MInputContextWestonIMProtocolConnectionPrivate::handleInputMethodContextEnt
 
     qDebug() << "enter_key_type:" << enter_key_type;
 
+    if (enter_key_type > INT_MAX) {
+        qWarning() << "This conversion from unsigned int to int may result in data lost, because the value exceeds INT_MAX. Before: " << enter_key_type << ", After: " << INT_MAX;
+        return;
+    }
     state_info[EnterKeyTypeAttribute] = westonEnterKeyTypeToMaliit(static_cast<text_model_enter_key_type>(enter_key_type));
 
     q->updateWidgetInformation(connection_id, state_info, false);
@@ -1331,9 +1439,7 @@ MInputContextWestonIMProtocolConnection::MInputContextWestonIMProtocolConnection
 {
 }
 
-MInputContextWestonIMProtocolConnection::~MInputContextWestonIMProtocolConnection()
-{
-}
+MInputContextWestonIMProtocolConnection::~MInputContextWestonIMProtocolConnection() = default;
 
 void MInputContextWestonIMProtocolConnection::setDisplayId(int displayId)
 {
@@ -1343,39 +1449,47 @@ void MInputContextWestonIMProtocolConnection::setDisplayId(int displayId)
 }
 
 void MInputContextWestonIMProtocolConnection::sendPreeditString(const QString &string,
-                                                                const QList<Maliit::PreeditTextFormat> &preedit_formats,
-                                                                int replace_start,
-                                                                int replace_length,
-                                                                int cursor_pos)
+                                                                const QList<Maliit::PreeditTextFormat> &preeditFormats,
+                                                                int replaceStart,
+                                                                int replaceLength,
+                                                                int cursorPos)
 {
     Q_D(MInputContextWestonIMProtocolConnection);
 
     qDebug() << "Preedit:" << string
-             << "replace start:" << replace_start
-             << "replace length:" << replace_length
-             << "cursor position:" << cursor_pos;
+             << "replace start:" << replaceStart
+             << "replace length:" << replaceLength
+             << "cursor position:" << cursorPos;
 
     if (d->im_context) {
-        MInputContextConnection::sendPreeditString(string, preedit_formats,
-                                                   replace_start, replace_length,
-                                                   cursor_pos);
+        MInputContextConnection::sendPreeditString(string, preeditFormats,
+                                                   replaceStart, replaceLength,
+                                                   cursorPos);
         const QByteArray raw(string.toUtf8());
 
-        if (replace_length > 0) {
+        if (replaceLength > 0) {
             input_method_context_delete_surrounding_text(d->im_context, d->im_serial,
-                                                         replace_start, replace_length);
+                                                         replaceStart, replaceLength);
         }
-        Q_FOREACH (const Maliit::PreeditTextFormat& format, preedit_formats) {
+        Q_FOREACH (const Maliit::PreeditTextFormat& format, preeditFormats) {
+            if (format.start < 0 || format.length < 0) {
+                qWarning() << "Skipping preedit format with a negative range. start:" << format.start << "length:" << format.length;
+                continue;
+            }
             input_method_context_preedit_styling(d->im_context, d->im_serial,
                                                  format.start, format.length,
                                                  face_to_uint (format.preeditFace));
         }
-        if (cursor_pos < 0) {
-            cursor_pos = string.size() + 1 - cursor_pos;
+        if (cursorPos < 0) {
+            if (string.size() > INT_MAX + cursorPos) {
+                qWarning() << "string.size() + cursorPos value exceeds INT_MAX";
+                return;
+            }
+            cursorPos = string.size() + 1 - cursorPos;
         }
         input_method_context_preedit_cursor(d->im_context, d->im_serial,
                                             // convert from internal pos to byte pos
-                                            string.left(cursor_pos).toUtf8().size());
+                                            string.left(cursorPos).toUtf8().size());
         input_method_context_preedit_string(d->im_context, d->im_serial, raw.data(),
                                             raw.data());
     }
@@ -1447,40 +1561,37 @@ bool MInputContextWestonIMProtocolConnection::hiddenText(bool &valid)
 int MInputContextWestonIMProtocolConnection::anchorPosition(bool &valid)
 {
     qDebug() << "valid:" << valid;
-    bool result = MInputContextConnection::anchorPosition(valid);
+    int result = MInputContextConnection::anchorPosition(valid);
     return result;
 }
 
 void MInputContextWestonIMProtocolConnection::sendCommitString(const QString &string,
-                                                               int replace_start,
-                                                               int replace_length,
-                                                               int cursor_pos)
+                                                               int replaceStart,
+                                                               int replaceLength,
+                                                               int cursorPos)
 {
     Q_D(MInputContextWestonIMProtocolConnection);
 
     qDebug() << "commit:" << string
-             << "replace start:" << replace_start
-             << "replace length:" << replace_length
-             << "cursor position:" << cursor_pos;
+             << "replace start:" << replaceStart
+             << "replace length:" << replaceLength
+             << "cursor position:" << cursorPos;
 
     if (d->im_context) {
-        MInputContextConnection::sendCommitString(string, replace_start, replace_length, cursor_pos);
+        MInputContextConnection::sendCommitString(string, replaceStart, replaceLength, cursorPos);
         const QByteArray raw(string.toUtf8());
 
-        if (cursor_pos < 0) {
-            cursor_pos = string.size();
-        }
         input_method_context_preedit_string(d->im_context, d->im_serial, "", "");
         // NOTE: length is unsigned in wayland protocol
-        if (replace_length != 0) {
+        if (replaceLength != 0) {
             input_method_context_delete_surrounding_text(d->im_context, d->im_serial,
-                                                         replace_start, replace_length);
+                                                         replaceStart, replaceLength);
         }
-        const int pos = 0; // TODO (string.left(cursor_pos).toUtf8().size());
+        const int pos = 0; // TODO (string.left(cursorPos).toUtf8().size());
 
         input_method_context_cursor_position (d->im_context, d->im_serial, pos, pos);
         input_method_context_commit_string(d->im_context, d->im_serial, raw.data());
-                                           //string.left(cursor_pos).toUtf8().size());
+                                           //string.left(cursorPos).toUtf8().size());
     }
 }
 
@@ -1523,7 +1634,12 @@ void MInputContextWestonIMProtocolConnection::sendKeyEvent(const QKeyEvent &keyE
 
         qDebug() << "key_sym:" << key_sym << "state:" << state << "mod mask:" << mod_mask;
 
-        input_method_context_keysym(d->im_context, d->im_serial, keyEvent.timestamp(),
+        unsigned long long timestamp = keyEvent.timestamp();
+        if (timestamp > UINT_MAX) {
+            qWarning() << "This conversion from unsigned long to usigned int may result in data lost, because the value exceeds UINT_MAX. Before: " << timestamp << ", After: " << UINT_MAX;
+            return;
+        }
+        input_method_context_keysym(d->im_context, d->im_serial, (uint32_t) timestamp,
                                     key_sym, state, mod_mask);
     }
 }

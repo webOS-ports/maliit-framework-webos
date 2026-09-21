@@ -76,7 +76,7 @@ Q_SIGNALS:
 private:
     Q_SLOT void attributeValueChanged();
 
-    typedef QHash<QString, QSharedPointer<MSharedAttributeExtensionManagerPluginSetting> > SharedAttributeExtensionContainer;
+    using SharedAttributeExtensionContainer = QHash<QString, QSharedPointer<MSharedAttributeExtensionManagerPluginSetting> >;
     //! all registered attribute extensions
     SharedAttributeExtensionContainer sharedAttributeExtensions;
     QList<int> clientIds;

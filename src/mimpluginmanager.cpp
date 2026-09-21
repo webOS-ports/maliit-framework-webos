@@ -31,13 +31,17 @@
 #include "windowgroup.h"
 #include "webosloginfo.h"
 
-#include <QDir>
-#include <QPluginLoader>
-#include <QSignalMapper>
-#include <QWeakPointer>
 #include <QCoreApplication>
+#include <QDir>
+#include <QFile>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QPluginLoader>
+#include <QWeakPointer>
 
 #include <QDebug>
+#include <climits>
 #include <deque>
 
 namespace
@@ -68,14 +72,14 @@ MIMPluginManagerPrivate::MIMPluginManagerPrivate(const QSharedPointer<MInputCont
                                                  MIMPluginManager *p)
     : parent(p),
       mICConnection(connection),
-      localeInfo(0),
-      imAccessoryEnabledConf(0),
-      shutDownInterval(0),
-      isStaticService(0),
+      localeInfo(nullptr),
+      imAccessoryEnabledConf(nullptr),
+      shutDownInterval(nullptr),
+      isStaticService(nullptr),
       adaptor(nullptr),
-      q_ptr(0),
+      q_ptr(nullptr),
       visible(false),
-      onScreenPlugins(),
+
       lastOrientation(0),
       attributeExtensionManager(new MAttributeExtensionManager),
       sharedAttributeExtensionManager(new MSharedAttributeExtensionManager),
@@ -90,6 +94,13 @@ MIMPluginManagerPrivate::MIMPluginManagerPrivate(const QSharedPointer<MInputCont
 MIMPluginManagerPrivate::~MIMPluginManagerPrivate()
 {
     qDeleteAll(handlerToPluginConfs);
+    handlerToPluginConfs.clear();
+
+    // Parentless, so nothing else is going to collect these.
+    delete localeInfo;
+    delete imAccessoryEnabledConf;
+    delete shutDownInterval;
+    delete isStaticService;
 }
 
 void MIMPluginManagerPrivate::loadPlugins(QStringList &pluginDirs)
@@ -135,7 +146,7 @@ Maliit::Plugins::InputMethodPlugin* MIMPluginManagerPrivate::loadPlugin(const QD
 
     if (blacklist.contains(fileName)) {
         qWarning() << fileName << "is blacklisted by" << MImPluginDisabled;
-        return 0;
+        return nullptr;
     }
 
     QFileInfo pluginInfo = QFileInfo(dir, fileName);
@@ -143,17 +154,17 @@ Maliit::Plugins::InputMethodPlugin* MIMPluginManagerPrivate::loadPlugin(const QD
 
     if (blacklist.contains(pluginPath)) {
         qWarning() << fileName << "is already known as not a valid plugin";
-        return 0;
+        return nullptr;
     }
 
-    Maliit::Plugins::InputMethodPlugin *plugin = 0;
+    Maliit::Plugins::InputMethodPlugin *plugin = nullptr;
     QString pluginVersion("");
-    QPluginLoader *loader = 0;
+    QPluginLoader *loader = nullptr;
 
     loader = new QPluginLoader(pluginPath);
     if (!loader) {
         qWarning() << "Failed to create QPluginLoader";
-        return 0;
+        return nullptr;
     }
 
     if (loader->isLoaded()) {
@@ -170,7 +181,7 @@ Maliit::Plugins::InputMethodPlugin* MIMPluginManagerPrivate::loadPlugin(const QD
         qWarning() << "Error loading file as plugin" << pluginPath << "with an error" << loader->errorString() << "(blacklisted)";
         blacklist.append(pluginPath);
         delete loader;
-        return 0;
+        return nullptr;
     }
 
     plugin = qobject_cast<Maliit::Plugins::InputMethodPlugin *>(pluginInstance);
@@ -178,7 +189,7 @@ Maliit::Plugins::InputMethodPlugin* MIMPluginManagerPrivate::loadPlugin(const QD
         qWarning() << pluginPath << "is not a Maliit::Server::InputMethodPlugin (blacklisted)";
         blacklist.append(pluginPath);
         delete loader;
-        return 0;
+        return nullptr;
     }
 
     pluginVersion = loader->metaData().value("MetaData").toObject().value("version").toString();
@@ -188,7 +199,7 @@ Maliit::Plugins::InputMethodPlugin* MIMPluginManagerPrivate::loadPlugin(const QD
         qWarning() << pluginPath << "is a plugin that does not support any state (blacklisted)";
         blacklist.append(pluginPath);
         delete loader;
-        return 0;
+        return nullptr;
     }
 
     QSharedPointer<Maliit::WindowGroup> windowGroup(new Maliit::WindowGroup(m_platform));
@@ -204,7 +215,7 @@ Maliit::Plugins::InputMethodPlugin* MIMPluginManagerPrivate::loadPlugin(const QD
         qWarning() << "Creation of InputMethod failed:" << plugin->name() << pluginPath;
         delete host;
         delete loader;
-        return 0;
+        return nullptr;
     }
 
     PluginDescription desc = { im, host, PluginState(),
@@ -242,27 +253,32 @@ bool MIMPluginManagerPrivate::unloadPlugin(Maliit::Plugins::InputMethodPlugin *p
 
     plugins.remove(plugin);
     desc.windowGroup.clear();
-    if (desc.imHost)
+
         delete desc.imHost;
-    if (desc.inputMethod)
+
         delete desc.inputMethod;
 
-    if (desc.loader) {
-        if (!desc.loader->isLoaded()) {
-            qWarning() << "Requested plugin" << desc.loader->fileName() << "seems not loaded";
-            return false;
-        }
+    // The description is gone from the map, so this is the last reference to
+    // the loader: it has to be destroyed here whichever way we leave.
+    const QScopedPointer<QPluginLoader> loader(desc.loader);
 
-        qDebug() << "Unloading file" << desc.loader->fileName();
-
-        if (!desc.loader->unload()) {
-            qWarning() << "Failed to unload plugin" << desc.loader->fileName() << "with an error" << desc.loader->errorString();
-            return false;
-        }
-        qInfo() << "Plugin unloaded" << desc.pluginId << desc.loader->fileName();
-    } else {
+    if (!loader) {
         qWarning() << "Failed to find plugin loader" << desc.pluginId;
+        return true;
     }
+
+    if (!loader->isLoaded()) {
+        qWarning() << "Requested plugin" << loader->fileName() << "seems not loaded";
+        return false;
+    }
+
+    qDebug() << "Unloading file" << loader->fileName();
+
+    if (!loader->unload()) {
+        qWarning() << "Failed to unload plugin" << loader->fileName() << "with an error" << loader->errorString();
+        return false;
+    }
+    qInfo() << "Plugin unloaded" << desc.pluginId << loader->fileName();
 
     return true;
 }
@@ -275,7 +291,7 @@ void MIMPluginManagerPrivate::activatePlugin(Maliit::Plugins::InputMethodPlugin 
     }
     webOSLogInfo("SWITCHPLUGIN", "STATE_CHANGE", plugin->name());
 
-    MAbstractInputMethod *inputMethod = 0;
+    MAbstractInputMethod *inputMethod = nullptr;
 
     activePlugins.insert(plugin);
     inputMethod = plugins.value(plugin).inputMethod;
@@ -392,7 +408,7 @@ void MIMPluginManagerPrivate::registerSettings(const MImPluginSettingsInfo &info
 void MIMPluginManagerPrivate::setActiveHandlers(const QSet<Maliit::HandlerState> &states)
 {
     QSet<Maliit::Plugins::InputMethodPlugin *> activatedPlugins;
-    MAbstractInputMethod *inputMethod = 0;
+    MAbstractInputMethod *inputMethod = nullptr;
 
     //clear all cached states before activating new one
     for (Plugins::iterator iterator = plugins.begin();
@@ -404,7 +420,7 @@ void MIMPluginManagerPrivate::setActiveHandlers(const QSet<Maliit::HandlerState>
     //activate new plugins
     Q_FOREACH (Maliit::HandlerState state, states) {
         HandlerMap::const_iterator iterator = handlerToPlugin.find(state);
-        Maliit::Plugins::InputMethodPlugin *plugin = 0;
+        Maliit::Plugins::InputMethodPlugin *plugin = nullptr;
 
         if (iterator != handlerToPlugin.end()) {
             plugin = iterator.value();
@@ -457,7 +473,7 @@ void MIMPluginManagerPrivate::deactivatePlugin(Maliit::Plugins::InputMethodPlugi
         return;
     }
 
-    MAbstractInputMethod *inputMethod = 0;
+    MAbstractInputMethod *inputMethod = nullptr;
 
     activePlugins.remove(plugin);
     inputMethod = plugins.value(plugin).inputMethod;
@@ -471,7 +487,7 @@ void MIMPluginManagerPrivate::deactivatePlugin(Maliit::Plugins::InputMethodPlugi
     plugins.value(plugin).imHost->setEnabled(false);
 
     plugins[plugin].state = PluginState();
-    QObject::disconnect(inputMethod, 0, q, 0);
+    QObject::disconnect(inputMethod, nullptr, q, nullptr);
     targets.remove(inputMethod);
 }
 
@@ -485,7 +501,7 @@ void MIMPluginManagerPrivate::replacePlugin(Maliit::SwitchDirection direction,
         state = plugins.value(source).state;
     else
         state << Maliit::OnScreen;
-    MAbstractInputMethod *switchedTo = 0;
+    MAbstractInputMethod *switchedTo = nullptr;
 
     activatePlugin(replacement.key());
     switchedTo = replacement->inputMethod;
@@ -609,7 +625,7 @@ bool MIMPluginManagerPrivate::switchPlugin(const QString &pluginId,
 
     if (source == plugins.end()) {
         qWarning() << pluginId << "could not find initiator";
-        return trySwitchPlugin(Maliit::SwitchUndefined, 0, iterator, subViewId);
+        return trySwitchPlugin(Maliit::SwitchUndefined, nullptr, iterator, subViewId);
     }
 
     return trySwitchPlugin(Maliit::SwitchUndefined, source.key(), iterator, subViewId);
@@ -666,7 +682,7 @@ QString MIMPluginManagerPrivate::inputSourceName(Maliit::HandlerState source) co
 
 void MIMPluginManagerPrivate::changeHandlerMap(Maliit::Plugins::InputMethodPlugin *origin,
                                                Maliit::Plugins::InputMethodPlugin *replacement,
-                                               QSet<Maliit::HandlerState> states)
+                                               const QSet<Maliit::HandlerState>& states)
 {
     Q_FOREACH (Maliit::HandlerState state, states) {
         if (state == Maliit::OnScreen) {
@@ -895,16 +911,11 @@ void MIMPluginManagerPrivate::loadHandlerMap()
 {
     Q_Q(MIMPluginManager);
 
-    static QSignalMapper *signalMapper = 0;
-
-    // These variables should be reset whenever this method is called
-    if (signalMapper) {
-        qDeleteAll(handlerToPluginConfs);
-        handlerToPluginConfs.clear();
-        handlerToPlugin.clear();
-        delete signalMapper;
-    }
-    signalMapper = new QSignalMapper(q);
+    // These are rebuilt from scratch on every call. Deleting the settings
+    // objects drops their connections with them.
+    qDeleteAll(handlerToPluginConfs);
+    handlerToPluginConfs.clear();
+    handlerToPlugin.clear();
 
     // Queries all children under PluginRoot, each is a setting entry that maps an
     // input source to a plugin that handles it
@@ -921,10 +932,11 @@ void MIMPluginManagerPrivate::loadHandlerMap()
         handlerToPluginConfs.append(handlerItem);
         const QString &pluginName = handlerItem->value().toString();
         addHandlerMap(i.key(), pluginName);
-        QObject::connect(handlerItem, SIGNAL(valueChanged()), signalMapper, SLOT(map()));
-        signalMapper->setMapping(handlerItem, i.key());
+
+        const int state = i.key();
+        QObject::connect(handlerItem, &MImSettings::valueChanged,
+                         q, [this, state]() { _q_syncHandlerMap(state); });
     }
-    QObject::connect(signalMapper, SIGNAL(mapped(int)), q, SLOT(_q_syncHandlerMap(int)));
 }
 
 
@@ -941,7 +953,7 @@ void MIMPluginManagerPrivate::_q_syncHandlerMap(int state)
        return;
     }
 
-    Maliit::Plugins::InputMethodPlugin *replacement = 0;
+    Maliit::Plugins::InputMethodPlugin *replacement = nullptr;
     Q_FOREACH (Maliit::Plugins::InputMethodPlugin *plugin, plugins.keys()) {
         if (plugins.value(plugin).pluginId == pluginId) {
             replacement = plugin;
@@ -970,7 +982,7 @@ void MIMPluginManagerPrivate::_q_onScreenSubViewChanged()
         return;
     }
 
-    Maliit::Plugins::InputMethodPlugin *replacement = 0;
+    Maliit::Plugins::InputMethodPlugin *replacement = nullptr;
     Q_FOREACH (Maliit::Plugins::InputMethodPlugin *plugin, plugins.keys()) {
         if (plugins.value(plugin).pluginId == subView.plugin) {
             replacement = plugin;
@@ -980,7 +992,7 @@ void MIMPluginManagerPrivate::_q_onScreenSubViewChanged()
 
     if (replacement) {
         // switch plugin if handler is changed.
-        MAbstractInputMethod *inputMethod = 0;
+        MAbstractInputMethod *inputMethod = nullptr;
         if (activePlugins.contains(currentPlugin))
             inputMethod = plugins.value(currentPlugin).inputMethod;
         addHandlerMap(Maliit::OnScreen, subView.plugin);
@@ -992,7 +1004,7 @@ void MIMPluginManagerPrivate::_q_onScreenSubViewChanged()
 
 Maliit::Plugins::InputMethodPlugin *MIMPluginManagerPrivate::activePlugin(Maliit::HandlerState state) const
 {
-    Maliit::Plugins::InputMethodPlugin *plugin = 0;
+    Maliit::Plugins::InputMethodPlugin *plugin = nullptr;
     HandlerMap::const_iterator iterator = handlerToPlugin.find(state);
     if (iterator != handlerToPlugin.constEnd()) {
         plugin = iterator.value();
@@ -1186,8 +1198,7 @@ void MIMPluginManagerPrivate::setActivePlugin(const QString &pluginId,
 
 MIMPluginManager::MIMPluginManager(const QSharedPointer<MInputContextConnection>& icConnection,
                                    const QSharedPointer<Maliit::AbstractPlatform> &platform)
-    : QObject(),
-      d_ptr(new MIMPluginManagerPrivate(icConnection, platform, this))
+    : d_ptr(new MIMPluginManagerPrivate(icConnection, platform, this))
 {
     Q_D(MIMPluginManager);
 
@@ -1390,13 +1401,13 @@ void MIMPluginManager::updatePlugins()
     }
 
     if (!localeJson.isEmpty()) {
-        QString keyboardsLang = 0;
+        QString keyboardsLang;
         QJsonArray keyboardsArray = localeJson["keyboards"].toArray();
 
         qDebug() << "keyboards in localeInfo:" << keyboardsArray;
 
         if (!keyboardsArray.isEmpty()) {
-            for (ssize_t index = 0; index < keyboardsArray.size() ; ++index) {
+            for (qsizetype index = 0; index < keyboardsArray.size() ; ++index) {
                 if (!keyboardsArray[index].isNull()) {
                     keyboardsLang = keyboardsArray[index].toString();
                     webOSLogInfo("VKB_LANGUAGE", "keyboardLang", keyboardsLang);
@@ -1522,7 +1533,7 @@ void MIMPluginManager::setToolbar(const MAttributeExtensionId &id)
     // extension attribute will be used in a moment. without this, some vkbs
     // may have some flickering - first it could show default label and a
     // fraction of second later - an overriden label.
-    const bool callKeyOverrides(!(!focusState && mapEmpty));
+    const bool callKeyOverrides(focusState || !mapEmpty);
 
     Q_FOREACH (Maliit::Plugins::InputMethodPlugin *plugin, d->activePlugins) {
         if (callKeyOverrides)
@@ -1728,7 +1739,12 @@ void MIMPluginManager::handleWidgetStateChanged(unsigned int clientId,
         }
     }
 
-    const Qt::InputMethodHints lastHints(static_cast<int>(newState.value(Maliit::Internal::inputMethodHints).toLongLong()));
+    long long int inputMethodHint = newState.value(Maliit::Internal::inputMethodHints).toLongLong();
+    if (inputMethodHint < INT_MIN || inputMethodHint > INT_MAX) {
+        qWarning() << "This conversion from long long int to int may result in data lost, because the value exceeds INT range. inputMethodHint: " << inputMethodHint;
+        return;
+    }
+    const Qt::InputMethodHints lastHints(static_cast<int>(inputMethodHint));
     MImUpdateEvent ev(newState, changedProperties, lastHints);
 
     // general notification last
