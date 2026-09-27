@@ -639,6 +639,10 @@ QJsonObject IMELunaService::getKeyboardStatusJson() const
     // True where the keyboard folds or slides away, so a caller knows "usable"
     // can change without anything being plugged in or out.
     hardware.insert("slider", m_pluginManager->hardwareKeyboardIsSlider());
+    // The declared layout, or empty where none is - see
+    // MIMPluginManager::hardwareKeyboardLayout(). Always present as a key so a
+    // caller does not have to tell "not declared" from "old server".
+    hardware.insert("layout", m_pluginManager->hardwareKeyboardLayout());
 
     status.insert("hardwareKeyboard", hardware);
     status.insert("onScreenKeyboardForced", m_pluginManager->onScreenKeyboardForced());

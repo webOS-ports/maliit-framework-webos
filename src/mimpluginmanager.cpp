@@ -68,6 +68,10 @@ namespace
     //! Whether a telephone keypad counts as a hardware keyboard. Off by
     //! default; see MImHwKeyboardTracker::setAcceptedKinds().
     const QString MImHwKeyboardKeypad  = MALIIT_CONFIG_ROOT"hwkeyboard/keypadcounts";
+    //! The physical keyboard's layout, declared per device: QWERTY, QWERTZ,
+    //! AZERTY and the two localised variants legacy named. Empty by default,
+    //! because it cannot be worked out - see hardwareKeyboardLayout().
+    const QString MImHwKeyboardLayout  = MALIIT_CONFIG_ROOT"hwkeyboard/layout";
 
     const char * const InputMethodItem = "inputMethod";
     const char * const LoadAll = "loadAll";
@@ -109,6 +113,7 @@ MIMPluginManagerPrivate::~MIMPluginManagerPrivate()
     delete imAccessoryEnabledConf;
     delete hwkbForcedConf;
     delete hwkbKeypadConf;
+    delete hwkbLayoutConf;
     delete shutDownInterval;
     delete isStaticService;
 }
@@ -1351,8 +1356,13 @@ MIMPluginManager::MIMPluginManager(const QSharedPointer<MInputContextConnection>
     // any earlier read a wild pointer and took the server down on startup.
     d->hwkbForcedConf = new MImSettings(MImHwKeyboardForced);
     d->hwkbKeypadConf = new MImSettings(MImHwKeyboardKeypad);
+    d->hwkbLayoutConf = new MImSettings(MImHwKeyboardLayout);
     connect(d->hwkbForcedConf, SIGNAL(valueChanged()), this, SLOT(updateHwKeyboardPolicy()));
     connect(d->hwkbKeypadConf, SIGNAL(valueChanged()), this, SLOT(updateHwKeyboardPolicy()));
+    // Not updateHwKeyboardPolicy(): the layout changes nothing about which
+    // handler is chosen, it is only reported onwards.
+    connect(d->hwkbLayoutConf, SIGNAL(valueChanged()),
+            this, SIGNAL(hardwareKeyboardStatusChanged()));
     updateHwKeyboardPolicy();
 
     updatePlugins();
@@ -1499,6 +1509,16 @@ bool MIMPluginManager::hardwareKeyboardIsSlider() const
     Q_D(const MIMPluginManager);
 
     return d->hwkbTracker.hasSwitch();
+}
+
+QString MIMPluginManager::hardwareKeyboardLayout() const
+{
+    Q_D(const MIMPluginManager);
+
+    if (!d->hwkbLayoutConf)
+        return QString();
+
+    return d->hwkbLayoutConf->value().toString().trimmed();
 }
 
 bool MIMPluginManager::onScreenKeyboardForced() const

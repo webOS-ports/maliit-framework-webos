@@ -195,6 +195,7 @@ public:
     //! wrong can be corrected without a rebuild.
     MImSettings *hwkbForcedConf = nullptr;
     MImSettings *hwkbKeypadConf = nullptr;
+    MImSettings *hwkbLayoutConf = nullptr;
     MImSettings *shutDownInterval = nullptr;
     MImSettings *isStaticService = nullptr;
 

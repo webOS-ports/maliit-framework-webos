@@ -145,6 +145,17 @@ public:
      */
     bool onScreenKeyboardForced() const;
 
+    /*! \brief The physical keyboard's layout, as declared for this device.
+     *
+     * Empty when nothing declared one, which is the normal case. It cannot be
+     * worked out instead: evdev scancodes are positional, so a QWERTZ keyboard
+     * and a QWERTY one advertise exactly the same keys, and a USB or Bluetooth
+     * keyboard carries its layout in the compositor's xkb keymap rather than
+     * anywhere this can see. Legacy declared it per device too - the KEYoBRD
+     * token - and this is the same thing said in a settings key.
+     */
+    QString hardwareKeyboardLayout() const;
+
 public Q_SLOTS:
     void setOnScreenKeyboardForced(bool forced);
 
