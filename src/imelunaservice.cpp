@@ -21,12 +21,14 @@
 
 #include <QKeyEvent>
 #include "imelunaservice.h"
+#include "mimpluginmanager.h"
 #include "mimjsonparams.h"
 #include "minputcontextconnection.h"
 #include "luna-service2/lunaservice.h"
 #include "mimglobalsettings.h"
 
 const char *IMELunaService::SubscriberKey = "REMOTE_KEYBOARD_LIST";
+const char *IMELunaService::KeyboardStatusSubscriberKey = "KEYBOARD_STATUS_LIST";
 
 #include <QJsonObject>
 #include <utility>
@@ -119,8 +121,10 @@ protected:
 
 } // namespace
 
-IMELunaService::IMELunaService(QSharedPointer<MInputContextConnection> connection)
+IMELunaService::IMELunaService(QSharedPointer<MInputContextConnection> connection,
+                               MIMPluginManager *pluginManager)
     : m_connection(std::move(connection))
+    , m_pluginManager(pluginManager)
     , m_mainLoop(nullptr)
     , m_handle(nullptr)
     , m_focusChangedSinceLastBroadcast(false)
@@ -131,6 +135,11 @@ IMELunaService::IMELunaService(QSharedPointer<MInputContextConnection> connectio
     connect(m_connection.data(), &MInputContextConnection::widgetStateChanged, this, &IMELunaService::onWidgetStateChanged);
     connect(m_connection.data(), &MInputContextConnection::resetInputMethodRequest, this, &IMELunaService::onReset);
     connect(m_broadcastTimer, &QTimer::timeout, this, &IMELunaService::broadcastWidgetState);
+    if (m_pluginManager) {
+        connect(m_pluginManager, &MIMPluginManager::hardwareKeyboardStatusChanged,
+                this, &IMELunaService::onHardwareKeyboardStatusChanged);
+    }
+
 }
 
 IMELunaService::~IMELunaService()
@@ -615,12 +624,128 @@ bool IMELunaService::handleSubscriptionCancel(LSHandle *handle, LSMessage *messa
 
 } // extern "C"
 
+//! \brief What the shell needs to draw a "show the keyboard anyway" control, and
+//!        what anything else needs to know a physical keyboard is in use.
+QJsonObject IMELunaService::getKeyboardStatusJson() const
+{
+    QJsonObject status;
+
+    if (!m_pluginManager)
+        return status;
+
+    QJsonObject hardware;
+    hardware.insert("present", m_pluginManager->hardwareKeyboardPresent());
+    hardware.insert("usable", m_pluginManager->hardwareKeyboardUsable());
+    // True where the keyboard folds or slides away, so a caller knows "usable"
+    // can change without anything being plugged in or out.
+    hardware.insert("slider", m_pluginManager->hardwareKeyboardIsSlider());
+
+    status.insert("hardwareKeyboard", hardware);
+    status.insert("onScreenKeyboardForced", m_pluginManager->onScreenKeyboardForced());
+
+    return status;
+}
+
+void IMELunaService::onHardwareKeyboardStatusChanged()
+{
+    const QJsonObject status(getKeyboardStatusJson());
+
+    // updateInputSource() runs for reasons unrelated to this - an accessory
+    // setting, a plugin reload - so only say something when the answer moved.
+    if (status == m_lastKeyboardStatus)
+        return;
+
+    m_lastKeyboardStatus = status;
+
+    QJsonObject response(status);
+    response.insert("returnValue", true);
+
+    LSErrorWrapper err;
+    QJsonDocument document(response);
+
+    if (!LSSubscriptionReply(m_handle, IMELunaService::KeyboardStatusSubscriberKey,
+                             document.toJson().constData(), err)) {
+        qWarning() << "failed to broadcast the keyboard status";
+    }
+}
+
+bool IMELunaService::handleGetKeyboardStatus(LSHandle *handle, LSMessage *message, void *data)
+{
+    Q_UNUSED(handle);
+
+    IMELunaService *service = static_cast<IMELunaService *>(data);
+
+    LSMessageAdapter msg(message);
+
+    if (!service->m_pluginManager) {
+        msg.replyError("No plugin manager; keyboard status is unavailable");
+        return true;
+    }
+
+    QJsonObject response(service->getKeyboardStatusJson());
+    response.insert("returnValue", true);
+
+    if (msg.isSubscription()) {
+        if (!msg.addSubscription(IMELunaService::KeyboardStatusSubscriberKey)) {
+            msg.replyError("Failed to add subscription");
+            return true;
+        }
+
+        response.insert("subscribed", true);
+
+        // So the first broadcast after this is a real change and not a repeat of
+        // what the subscriber was just handed.
+        service->m_lastKeyboardStatus = service->getKeyboardStatusJson();
+    }
+
+    msg.respond(response);
+
+    return true;
+}
+
+//! \brief Asks for the on-screen keyboard even though a physical one is attached.
+//!
+//! The way back to an emoji, a script the hardware has no keys for, or a key it
+//! is missing. Sticky until turned off again, which is how LunaSysMgr's keyboard
+//! key behaved: it toggled IMEController and left it there.
+bool IMELunaService::handleSetOnScreenKeyboardForced(LSHandle *handle, LSMessage *message, void *data)
+{
+    Q_UNUSED(handle);
+
+    IMELunaService *service = static_cast<IMELunaService *>(data);
+
+    LSMessageAdapter msg(message);
+
+    if (!service->m_pluginManager) {
+        msg.replyError("No plugin manager; the on-screen keyboard cannot be forced");
+        return true;
+    }
+
+    const QJsonObject payload(msg.getPayload());
+    const QJsonValue forced(payload.value(QStringLiteral("forced")));
+
+    if (!forced.isBool()) {
+        msg.replyError("\"forced\" is required and must be a boolean");
+        return true;
+    }
+
+    service->m_pluginManager->setOnScreenKeyboardForced(forced.toBool());
+
+    QJsonObject response(service->getKeyboardStatusJson());
+    response.insert("returnValue", true);
+    msg.respond(response);
+
+    return true;
+}
+
 LSMethod IMELunaService::ime_bus_methods [] = {
     // Handlers for service methods for com.webos.service.ime
     {"registerRemoteKeyboard", IMELunaService::handleRegisterRemoteKeyboard, (LSMethodFlags) 0},
     {"insertText", IMELunaService::handleInsertText, (LSMethodFlags) 0},
     {"deleteCharacters", IMELunaService::handleDeleteCharacters, (LSMethodFlags) 0},
     {"sendEnterKey", IMELunaService::handleSendEnterKey, (LSMethodFlags) 0},
+    {"getKeyboardStatus", IMELunaService::handleGetKeyboardStatus, (LSMethodFlags) 0},
+    {"setOnScreenKeyboardForced", IMELunaService::handleSetOnScreenKeyboardForced, (LSMethodFlags) 0},
 
     {nullptr, nullptr, (LSMethodFlags) 0}
 };

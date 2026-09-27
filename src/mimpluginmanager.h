@@ -116,13 +116,38 @@ public:
                                                  const QVariantMap &attributes);
 
 Q_SIGNALS:
+    //! Emitted when the hardware keyboard status, or the override above, moves.
+    void hardwareKeyboardStatusChanged();
+
     //! This signal is emitted when input method plugins are loaded, unloaded,
     //! enabled or disabled
     void pluginsChanged();
 
     void pluginLoaded();
 
+public:
+    //! \brief Whether a physical keyboard is attached.
+    bool hardwareKeyboardPresent() const;
+
+    //! \brief Whether one is attached and can be typed on right now.
+    bool hardwareKeyboardUsable() const;
+
+    //! \brief Whether the keyboard slides or folds away; see
+    //!        MImHwKeyboardTracker::hasSwitch().
+    bool hardwareKeyboardIsSlider() const;
+
+    /*! \brief Whether the on-screen keyboard has been asked for anyway.
+     *
+     * A physical keyboard normally takes the on-screen one away. This is the way
+     * back for the things it cannot do - an emoji, a script it has no keys for, a
+     * key the hardware is missing - and it sticks until it is turned off again,
+     * which is how LunaSysMgr's own keyboard key behaved.
+     */
+    bool onScreenKeyboardForced() const;
+
 public Q_SLOTS:
+    void setOnScreenKeyboardForced(bool forced);
+
     //! Show active plugins.
     void showActivePlugins();
 

@@ -1480,6 +1480,62 @@ void MIMPluginManager::updatePlugins()
     }
 }
 
+bool MIMPluginManager::hardwareKeyboardPresent() const
+{
+    Q_D(const MIMPluginManager);
+
+    return d->hwkbTracker.isPresent();
+}
+
+bool MIMPluginManager::hardwareKeyboardUsable() const
+{
+    Q_D(const MIMPluginManager);
+
+    return d->hwkbTracker.isOpen();
+}
+
+bool MIMPluginManager::hardwareKeyboardIsSlider() const
+{
+    Q_D(const MIMPluginManager);
+
+    return d->hwkbTracker.hasSwitch();
+}
+
+bool MIMPluginManager::onScreenKeyboardForced() const
+{
+    Q_D(const MIMPluginManager);
+
+    if (!d->hwkbForcedConf)
+        return false;
+
+    return d->hwkbForcedConf->value().toString().trimmed().toLower()
+        == QLatin1String("off");
+}
+
+void MIMPluginManager::setOnScreenKeyboardForced(bool forced)
+{
+    Q_D(MIMPluginManager);
+
+    if (!d->hwkbForcedConf) {
+        qWarning() << "asked for the on-screen keyboard before the settings exist";
+        return;
+    }
+
+    if (onScreenKeyboardForced() == forced)
+        return;
+
+    // "off" is the tracker being told to report no hardware keyboard at all,
+    // which is what puts the handlers back on Maliit::OnScreen and the keys back
+    // on screen. Leaving it empty is "decide from the hardware".
+    d->hwkbForcedConf->set(forced ? QVariant(QStringLiteral("off")) : QVariant(QString()));
+
+    // Applied here rather than left to the setting's own change notification: a
+    // write from inside this process is not guaranteed to come back as one, and
+    // a toggle that sometimes does nothing is worse than one that is applied
+    // twice. updateHwKeyboardPolicy() is idempotent.
+    updateHwKeyboardPolicy();
+}
+
 void MIMPluginManager::updateHwKeyboardPolicy()
 {
     Q_D(MIMPluginManager);
@@ -1550,6 +1606,8 @@ void MIMPluginManager::updateInputSource()
     if (!handlers.isEmpty()) {
         d->setActiveHandlers(handlers);
     }
+
+    Q_EMIT hardwareKeyboardStatusChanged();
 }
 
 void MIMPluginManager::switchPlugin(Maliit::SwitchDirection direction,

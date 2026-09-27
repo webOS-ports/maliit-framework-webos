@@ -67,6 +67,14 @@ public:
     //! \brief Returns whether hardware keyboard is opened.
     bool isOpen() const;
 
+    /*! \brief Whether a keyboard-presence switch is being watched.
+     *
+     * True on a slider or a convertible, where the keyboard stays enumerated
+     * while it is folded away and isOpen() follows the switch. False where a
+     * keyboard is simply attached or not.
+     */
+    bool hasSwitch() const;
+
     //! \brief Which kinds of physical keyboard are attached right now.
     MImKeyboard::KeyboardKinds attachedKinds() const;
 

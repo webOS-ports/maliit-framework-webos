@@ -368,6 +368,13 @@ bool MImHwKeyboardTracker::isOpen() const
     return d->usable();
 }
 
+bool MImHwKeyboardTracker::hasSwitch() const
+{
+    Q_D(const MImHwKeyboardTracker);
+
+    return d->evdevFile != nullptr;
+}
+
 MImKeyboard::KeyboardKinds MImHwKeyboardTracker::attachedKinds() const
 {
     Q_D(const MImHwKeyboardTracker);
