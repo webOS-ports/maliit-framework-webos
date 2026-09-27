@@ -1508,7 +1508,21 @@ void MIMPluginManager::updateInputSource()
     // OnScreen is mutually exclusive to Hardware and Accessory.
     QSet<Maliit::HandlerState> handlers = d->activeHandlers();
 
-    if (d->hwkbTracker.isOpen()) {
+    // Only switch to Maliit::Hardware when a plugin is actually mapped to it.
+    // server.conf seeds plugins\hardware on first boot and is not rewritten
+    // afterwards, so a device that first booted a build without that line has no
+    // handler for it - and setActiveHandlers() would then deactivate the
+    // on-screen plugin as unnecessary without activating anything in its place,
+    // leaving no input method at all rather than one with its panel down.
+    const bool canHandleHardware = d->handlerToPlugin.contains(Maliit::Hardware);
+
+    if (d->hwkbTracker.isOpen() && !canHandleHardware) {
+        qWarning() << "a hardware keyboard is present but no plugin is registered"
+                   << "for it; keeping the on-screen keyboard. Set"
+                   << (PluginRoot + "/hardware") << "to a plugin to change that.";
+    }
+
+    if (d->hwkbTracker.isOpen() && canHandleHardware) {
         // hw keyboard is on
         handlers.remove(Maliit::OnScreen);
         handlers.insert(Maliit::Hardware);
