@@ -283,8 +283,11 @@ void Ut_MImHwKeyboardTracker::testForcedOn()
     tracker.setForcedState(1);
 
     QCOMPARE(changed.count(), 1);
-    QVERIFY(tracker.isPresent());
     QVERIFY(tracker.isOpen());
+
+    // Still no keyboard attached: the override says what to do, not what is
+    // plugged in.
+    QVERIFY(!tracker.isPresent());
 }
 
 void Ut_MImHwKeyboardTracker::testForcedOff()
@@ -297,11 +300,16 @@ void Ut_MImHwKeyboardTracker::testForcedOff()
     tracker.setForcedState(0);
 
     QVERIFY(!tracker.isOpen());
-    QVERIFY(!tracker.isPresent());
+
+    // The keyboard is still attached and still said to be. Anything that offers
+    // a way to undo this override needs to know it is still relevant - hiding
+    // the control the moment it is used would strand the user.
+    QVERIFY(tracker.isPresent());
 
     // Back to deciding from the hardware.
     tracker.setForcedState(-1);
     QVERIFY(tracker.isOpen());
+    QVERIFY(tracker.isPresent());
 }
 
 void Ut_MImHwKeyboardTracker::testZinwaQ25()

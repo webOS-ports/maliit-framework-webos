@@ -323,11 +323,15 @@ void MImHwKeyboardTrackerPrivate::evdevEvent()
 
 bool MImHwKeyboardTrackerPrivate::hasKeyboard() const
 {
-    if (forced >= 0)
-        return forced == 1;
-
-    // A switch is itself the device saying it has a keyboard, whether or not one
-    // of its nodes looks like one from its capabilities.
+    // Deliberately not overridden by "forced". This is the physical fact - is
+    // there a keyboard attached - and the override is about what to do about it,
+    // which is usable()'s business.
+    //
+    // They were the same answer once, and it stranded the user: asking for the
+    // on-screen keyboard sets forced to 0, which made isPresent() false, which
+    // made the shell's "Show On-screen Keyboard" entry - shown only where there
+    // is a hardware keyboard - hide itself. The way back disappeared the moment
+    // it was used.
     return attached != MImKeyboard::NotAKeyboard || evdevFile != nullptr;
 }
 
