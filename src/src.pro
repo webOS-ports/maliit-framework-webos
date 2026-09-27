@@ -52,6 +52,8 @@ SERVER_HEADERS_PRIVATE += \
         mattributeextensionmanager.h \
         msharedattributeextensionmanager.h \
         mimevdevbits.h \
+        miminputdevices.h \
+        mimkeyboardkind.h \
         mimhwkeyboardtracker.h \
         mimonscreenplugins.h \
         mimhwkeyboardtracker_p.h \
@@ -70,6 +72,8 @@ SERVER_SOURCES += \
         mattributeextensionmanager.cpp \
         msharedattributeextensionmanager.cpp \
         mimhwkeyboardtracker.cpp \
+        miminputdevices.cpp \
+        mimkeyboardkind.cpp \
         mimonscreenplugins.cpp \
         mimsubviewoverride.cpp \
         mimserveroptions.cpp \

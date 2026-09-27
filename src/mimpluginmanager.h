@@ -137,6 +137,9 @@ private Q_SLOTS:
     //! Update and activate input source.
     void updateInputSource();
 
+    //! Apply the hardware keyboard detection settings to the tracker.
+    void updateHwKeyboardPolicy();
+
     //! Set toolbar to active plugin with given \a id
     void setToolbar(const MAttributeExtensionId &id);
 

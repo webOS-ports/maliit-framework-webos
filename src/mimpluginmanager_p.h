@@ -188,6 +188,10 @@ public:
     QList<MImSettings *> handlerToPluginConfs;
     MImSettings *localeInfo;
     MImSettings *imAccessoryEnabledConf;
+    //! Overrides for hardware keyboard detection, so a device this gets
+    //! wrong can be corrected without a rebuild.
+    MImSettings *hwkbForcedConf = nullptr;
+    MImSettings *hwkbKeypadConf = nullptr;
     MImSettings *shutDownInterval;
     MImSettings *isStaticService;
 

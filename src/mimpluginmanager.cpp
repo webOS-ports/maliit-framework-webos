@@ -24,6 +24,7 @@
 #include <maliit/plugins/abstractinputmethod.h>
 #include "mimsettings.h"
 #include "mimhwkeyboardtracker.h"
+#include "mimkeyboardkind.h"
 #include <maliit/plugins/updateevent.h>
 #include "mimsubviewoverride.h"
 #include "maliit/namespaceinternal.h"
@@ -60,6 +61,13 @@ namespace
     const QString PluginRoot           = MALIIT_CONFIG_ROOT"plugins";
     const QString PluginSettings       = MALIIT_CONFIG_ROOT"pluginsettings";
     const QString MImAccesoryEnabled   = MALIIT_CONFIG_ROOT"accessoryenabled";
+
+    //! "on" to report a hardware keyboard whatever the hardware says, "off"
+    //! never to, anything else (the default) to decide from the hardware.
+    const QString MImHwKeyboardForced  = MALIIT_CONFIG_ROOT"hwkeyboard/forced";
+    //! Whether a telephone keypad counts as a hardware keyboard. Off by
+    //! default; see MImHwKeyboardTracker::setAcceptedKinds().
+    const QString MImHwKeyboardKeypad  = MALIIT_CONFIG_ROOT"hwkeyboard/keypadcounts";
 
     const char * const InputMethodItem = "inputMethod";
     const char * const LoadAll = "loadAll";
@@ -99,6 +107,8 @@ MIMPluginManagerPrivate::~MIMPluginManagerPrivate()
     // Parentless, so nothing else is going to collect these.
     delete localeInfo;
     delete imAccessoryEnabledConf;
+    delete hwkbForcedConf;
+    delete hwkbKeypadConf;
     delete shutDownInterval;
     delete isStaticService;
 }
@@ -431,19 +441,26 @@ void MIMPluginManagerPrivate::setActiveHandlers(const QSet<Maliit::HandlerState>
             if (plugin && inputMethod) {
                 plugins[plugin].state << state;
                 activatedPlugins.insert(plugin);
-
-                if (visible) {
-                    ensureActivePluginsVisible(DontShowInputMethod);
-                    inputMethod->show();
-                    inputMethod->showLanguageNotification();
-                }
             }
         }
     }
 
-    // notify plugins about new states
+    // Notify plugins about new states. Before showing anything, not after: a
+    // plugin decides from its state whether it puts a window up at all - one
+    // serving Maliit::Hardware keeps its on-screen keyboard down - and telling
+    // it afterwards let the panel flash up on every switch to a hardware
+    // keyboard.
     Q_FOREACH (Maliit::Plugins::InputMethodPlugin *plugin, activatedPlugins) {
         plugins.value(plugin).inputMethod->setState(plugins.value(plugin).state);
+    }
+
+    if (visible) {
+        ensureActivePluginsVisible(DontShowInputMethod);
+
+        Q_FOREACH (Maliit::Plugins::InputMethodPlugin *plugin, activatedPlugins) {
+            plugins.value(plugin).inputMethod->show();
+            plugins.value(plugin).inputMethod->showLanguageNotification();
+        }
     }
 
     // deactivate unnecessary plugins
@@ -1303,8 +1320,19 @@ MIMPluginManager::MIMPluginManager(const QSharedPointer<MInputContextConnection>
 
     connect(&d->onScreenPlugins, SIGNAL(activeSubViewChanged()), this, SLOT(_q_onScreenSubViewChanged()));
     connect(&d->onScreenPlugins, SIGNAL(enabledPluginsChanged()), this, SIGNAL(pluginsChanged()));
-    if (d->hwkbTracker.isPresent())
-        connect(&d->hwkbTracker, SIGNAL(stateChanged()), this, SLOT(updateInputSource()), Qt::UniqueConnection);
+
+    // Unconditionally, unlike before: presence is no longer fixed at startup by
+    // whether a SW_TABLET_MODE switch exists. A detachable keyboard - the
+    // PineTab2's, a USB or a Bluetooth one - arrives and leaves while the
+    // session runs, and when it leaves mid-sentence the on-screen keyboard has
+    // to come back for the field that is focused right now.
+    connect(&d->hwkbTracker, SIGNAL(stateChanged()), this, SLOT(updateInputSource()), Qt::UniqueConnection);
+
+    d->hwkbForcedConf = new MImSettings(MImHwKeyboardForced);
+    d->hwkbKeypadConf = new MImSettings(MImHwKeyboardKeypad);
+    connect(d->hwkbForcedConf, SIGNAL(valueChanged()), this, SLOT(updateHwKeyboardPolicy()));
+    connect(d->hwkbKeypadConf, SIGNAL(valueChanged()), this, SLOT(updateHwKeyboardPolicy()));
+    updateHwKeyboardPolicy();
 
     d->imAccessoryEnabledConf = new MImSettings(MImAccesoryEnabled);
     d->imAccessoryEnabledConf->set(false); // start Maliit with accessory disabled
@@ -1446,6 +1474,31 @@ void MIMPluginManager::updatePlugins()
         d->_q_onScreenSubViewChanged();
         updateInputSource();
     }
+}
+
+void MIMPluginManager::updateHwKeyboardPolicy()
+{
+    Q_D(MIMPluginManager);
+
+    const QString forced(d->hwkbForcedConf->value().toString().trimmed().toLower());
+
+    if (forced == QLatin1String("on"))
+        d->hwkbTracker.setForcedState(1);
+    else if (forced == QLatin1String("off"))
+        d->hwkbTracker.setForcedState(0);
+    else
+        d->hwkbTracker.setForcedState(-1);
+
+    MImKeyboard::KeyboardKinds kinds(MImKeyboard::TextKeyboard);
+
+    if (d->hwkbKeypadConf->value(false).toBool())
+        kinds |= MImKeyboard::TelephoneKeypad;
+
+    d->hwkbTracker.setAcceptedKinds(kinds);
+
+    // The tracker only signals when its answer moves, and on the first call here
+    // it has not moved at all - so drive the handlers from what it says now.
+    updateInputSource();
 }
 
 void MIMPluginManager::updateInputSource()
