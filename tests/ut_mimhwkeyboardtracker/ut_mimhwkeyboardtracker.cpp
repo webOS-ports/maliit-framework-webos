@@ -47,6 +47,43 @@ const char *const KeypadBlock =
     "B: KEY=800 0 0 0 0 0 0 0 0 8 0 0 0 1c0000 0 0 ffc\n"
     "\n";
 
+//! A Zinwa Q25, copied off the device. Worth having verbatim rather than
+//! reduced to a synthetic case: it is the device this detection was written for,
+//! its keyboard is resolved in the kernel by bbqX0kbd so webos-keyboard
+//! deliberately ships no profile for it, and its headset jack advertises four
+//! EV_SW codes - which is exactly the shape that must not be mistaken for a
+//! keyboard-presence switch.
+const char *const Q25Devices =
+    "I: Bus=0000 Vendor=0000 Product=0000 Version=0000\n"
+    "N: Name=\"mtk-pmic-keys\"\n"
+    "S: Sysfs=/devices/platform/soc/10026000.pwrap/10026000.pwrap:mt6366/mtk-pmic-keys/input/input0\n"
+    "H: Handlers=kbd event0 \n"
+    "B: KEY=18000000000000 0\n"
+    "\n"
+    "N: Name=\"mtk-kpd\"\n"
+    "S: Sysfs=/devices/platform/soc/10010000.kp/input/input1\n"
+    "H: Handlers=kbd event1 \n"
+    "B: KEY=6000000000000 0\n"
+    "\n"
+    "N: Name=\"Q25_keyboard\"\n"
+    "P: Phys=\n"
+    "S: Sysfs=/devices/platform/soc/1101a000.i2c/i2c-6/6-001f/input/input2\n"
+    "H: Handlers=kbd event2 \n"
+    "B: KEY=10 0 0 0 0 30000 8000000000 100040000000 e96d000000000 37fffffdffffffe\n"
+    "\n"
+    "N: Name=\"s2716b_ts\"\n"
+    "S: Sysfs=/devices/platform/soc/11e00000.i2c/i2c-0/0-0067/input/input3\n"
+    "H: Handlers=event3 \n"
+    "B: KEY=420 0 0 0 0 0\n"
+    "\n"
+    "N: Name=\"mt6789-mt6366 Headset Jack\"\n"
+    "P: Phys=ALSA\n"
+    "S: Sysfs=/devices/platform/soc/soc:sound/sound/card0/input5\n"
+    "H: Handlers=kbd event4\n"
+    "B: KEY=40 0 0 0 0 0 0 1000000000 c000000000000 0\n"
+    "B: SW=d4\n"
+    "\n";
+
 const char *const VirtualKeyboardBlock =
     "N: Name=\"RustDesk UInput Keyboard\"\n"
     "S: Sysfs=/devices/virtual/input/input481\n"
@@ -82,6 +119,8 @@ private Q_SLOTS:
 
     void testForcedOn();
     void testForcedOff();
+
+    void testZinwaQ25();
 
 private:
     QTemporaryFile *m_devices = nullptr;
@@ -263,6 +302,31 @@ void Ut_MImHwKeyboardTracker::testForcedOff()
     // Back to deciding from the hardware.
     tracker.setForcedState(-1);
     QVERIFY(tracker.isOpen());
+}
+
+void Ut_MImHwKeyboardTracker::testZinwaQ25()
+{
+    setDevices(Q25Devices);
+
+    const MImHwKeyboardTracker tracker;
+
+    QVERIFY(tracker.isPresent());
+    QVERIFY(tracker.isOpen());
+    QVERIFY(tracker.attachedKinds().testFlag(MImKeyboard::TextKeyboard));
+
+    // Its keypad is a handful of keys, not a telephone keypad, so nothing here
+    // depends on the keypad policy either way.
+    QVERIFY(!tracker.attachedKinds().testFlag(MImKeyboard::TelephoneKeypad));
+
+    // And the headset jack's EV_SW codes must not have been taken for a
+    // keyboard-presence switch: if they had, isOpen() would be answering from a
+    // jack rather than from the keyboard, and plugging headphones in would take
+    // the keyboard away.
+    MImHwKeyboardTracker plain;
+    plain.setForcedState(0);
+    QVERIFY(!plain.isOpen());
+    plain.setForcedState(-1);
+    QVERIFY(plain.isOpen());
 }
 
 QTEST_GUILESS_MAIN(Ut_MImHwKeyboardTracker)
