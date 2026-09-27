@@ -347,6 +347,22 @@ public:
      */
     virtual QString serviceName() const = 0;
 
+    /*!
+     * \brief Asks for the on-screen keyboard to be forced on, or lets the
+     * hardware decide again.
+     *
+     * The same switch the shell's system menu drives, offered to the plugin so
+     * that the two cannot disagree. A plugin that lets the user put the keys
+     * away while a physical keyboard is attached has to release the force here
+     * rather than remember the dismissal privately: the menu reads this state,
+     * so a private flag would leave the toggle still saying "on" and the user
+     * would have to switch it off and back on to get the keys returned.
+     *
+     * Not pure, and a no-op by default: a host that has no notion of a hardware
+     * keyboard has nothing to force.
+     */
+    virtual void setOnScreenKeyboardForced(bool forced) { Q_UNUSED(forced); }
+
 private:
     Q_DISABLE_COPY(MAbstractInputMethodHost)
     Q_DECLARE_PRIVATE(MAbstractInputMethodHost)

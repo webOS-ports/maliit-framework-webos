@@ -265,6 +265,13 @@ AbstractPluginSetting *MInputMethodHost::registerPluginSetting(const QString &ke
     return pluginManager->registerPluginSetting(pluginId, pluginDescription, key, description, type, attributes);
 }
 
+void MInputMethodHost::setOnScreenKeyboardForced(bool forced)
+{
+    // Not gated on enabled: the plugin whose keys the user just dragged away is
+    // by definition the active one, and this is the moment its request matters.
+    pluginManager->setOnScreenKeyboardForced(forced);
+}
+
 int MInputMethodHost::instanceId() const
 {
     return MImGlobalSettings::instance()->getInstanceId();

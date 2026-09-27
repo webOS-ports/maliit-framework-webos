@@ -109,6 +109,7 @@ public:
     virtual int instanceId() const;
     virtual QString appId() const;
     virtual QString serviceName() const;
+    virtual void setOnScreenKeyboardForced(bool forced);
     // \reimp_end
 
 private:
