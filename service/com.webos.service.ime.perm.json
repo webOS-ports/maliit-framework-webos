@@ -36,5 +36,8 @@
     "com.webos.surfacemanager*": [
         "ime.query",
         "ime.operation"
+    ],
+    "com.palm.webappmanager": [
+        "ime.query"
     ]
 }
