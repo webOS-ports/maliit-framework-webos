@@ -1504,6 +1504,35 @@ bool MIMPluginManager::hardwareKeyboardUsable() const
     return d->hwkbTracker.isOpen();
 }
 
+QString MIMPluginManager::declaredKeyboardLayout()
+{
+    // Read on each query rather than cached: the file is a bind mount put in
+    // place during boot by luneos-device-config, and the server can outlive a
+    // re-run of that. It is a few bytes.
+    QByteArray path(qgetenv("MALIIT_HWKEYBOARD_LAYOUT_FILE"));
+
+    if (path.isEmpty())
+        path = QByteArray(MALIIT_HWKEYBOARD_LAYOUT_FILE);
+
+    QFile file(QString::fromLocal8Bit(path));
+
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+        return QString();
+
+    // First line that is neither blank nor a comment. The shipped file is all
+    // comment, which is how a device that declares nothing says so.
+    while (!file.atEnd()) {
+        const QString line(QString::fromUtf8(file.readLine()).trimmed());
+
+        if (line.isEmpty() || line.startsWith(QLatin1Char('#')))
+            continue;
+
+        return line;
+    }
+
+    return QString();
+}
+
 bool MIMPluginManager::hardwareKeyboardIsSlider() const
 {
     Q_D(const MIMPluginManager);
@@ -1515,10 +1544,17 @@ QString MIMPluginManager::hardwareKeyboardLayout() const
 {
     Q_D(const MIMPluginManager);
 
-    if (!d->hwkbLayoutConf)
-        return QString();
+    // The setting wins where it is set, so a preference - or a test - can
+    // override the hardware. Empty is the default, and then the device's own
+    // declaration stands.
+    if (d->hwkbLayoutConf) {
+        const QString configured(d->hwkbLayoutConf->value().toString().trimmed());
 
-    return d->hwkbLayoutConf->value().toString().trimmed();
+        if (!configured.isEmpty())
+            return configured;
+    }
+
+    return declaredKeyboardLayout();
 }
 
 bool MIMPluginManager::onScreenKeyboardForced() const

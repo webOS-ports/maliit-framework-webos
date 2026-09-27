@@ -156,6 +156,18 @@ public:
      */
     QString hardwareKeyboardLayout() const;
 
+    /*! \brief The layout this device declares, ignoring the settings override.
+     *
+     * Read from a file rather than a setting because it is a fact about the
+     * hardware, not a preference: on LuneOS one rootfs boots every device, so it
+     * is bind-mounted into place during boot by luneos-device-config's
+     * 77-hwkeyboard-layout generator, from deviceinfo_keyboard_layout in the
+     * adaptation. The shipped file is all comment, which is how a device that
+     * declares nothing says so. MALIIT_HWKEYBOARD_LAYOUT_FILE overrides the
+     * path.
+     */
+    static QString declaredKeyboardLayout();
+
 public Q_SLOTS:
     void setOnScreenKeyboardForced(bool forced);
 
