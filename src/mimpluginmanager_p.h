@@ -186,14 +186,17 @@ public:
     HandlerMap handlerToPlugin;
 
     QList<MImSettings *> handlerToPluginConfs;
-    MImSettings *localeInfo;
-    MImSettings *imAccessoryEnabledConf;
+    // All of these are deleted in the destructor and assigned partway through
+    // MIMPluginManager's constructor, so an early return - or, as happened, code
+    // reading one before its turn - hit an indeterminate pointer.
+    MImSettings *localeInfo = nullptr;
+    MImSettings *imAccessoryEnabledConf = nullptr;
     //! Overrides for hardware keyboard detection, so a device this gets
     //! wrong can be corrected without a rebuild.
     MImSettings *hwkbForcedConf = nullptr;
     MImSettings *hwkbKeypadConf = nullptr;
-    MImSettings *shutDownInterval;
-    MImSettings *isStaticService;
+    MImSettings *shutDownInterval = nullptr;
+    MImSettings *isStaticService = nullptr;
 
     QTimer shutDownTimer;
     QString activeSubViewIdOnScreen;

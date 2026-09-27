@@ -1328,12 +1328,6 @@ MIMPluginManager::MIMPluginManager(const QSharedPointer<MInputContextConnection>
     // to come back for the field that is focused right now.
     connect(&d->hwkbTracker, SIGNAL(stateChanged()), this, SLOT(updateInputSource()), Qt::UniqueConnection);
 
-    d->hwkbForcedConf = new MImSettings(MImHwKeyboardForced);
-    d->hwkbKeypadConf = new MImSettings(MImHwKeyboardKeypad);
-    connect(d->hwkbForcedConf, SIGNAL(valueChanged()), this, SLOT(updateHwKeyboardPolicy()));
-    connect(d->hwkbKeypadConf, SIGNAL(valueChanged()), this, SLOT(updateHwKeyboardPolicy()));
-    updateHwKeyboardPolicy();
-
     d->imAccessoryEnabledConf = new MImSettings(MImAccesoryEnabled);
     d->imAccessoryEnabledConf->set(false); // start Maliit with accessory disabled
     d->shutDownInterval = new MImSettings("timeout");
@@ -1350,6 +1344,16 @@ MIMPluginManager::MIMPluginManager(const QSharedPointer<MInputContextConnection>
 
     connect(d->imAccessoryEnabledConf, SIGNAL(valueChanged()), this, SLOT(updateInputSource()));
     connect(d->localeInfo, SIGNAL(valueChanged()), this, SLOT(updatePlugins()));
+
+    // Deliberately down here, after every setting updateInputSource() reads has
+    // been constructed. It dereferences imAccessoryEnabledConf, and these
+    // members are raw pointers that nothing initialises, so applying the policy
+    // any earlier read a wild pointer and took the server down on startup.
+    d->hwkbForcedConf = new MImSettings(MImHwKeyboardForced);
+    d->hwkbKeypadConf = new MImSettings(MImHwKeyboardKeypad);
+    connect(d->hwkbForcedConf, SIGNAL(valueChanged()), this, SLOT(updateHwKeyboardPolicy()));
+    connect(d->hwkbKeypadConf, SIGNAL(valueChanged()), this, SLOT(updateHwKeyboardPolicy()));
+    updateHwKeyboardPolicy();
 
     updatePlugins();
 }
@@ -1516,7 +1520,11 @@ void MIMPluginManager::updateInputSource()
     // leaving no input method at all rather than one with its panel down.
     const bool canHandleHardware = d->handlerToPlugin.contains(Maliit::Hardware);
 
-    if (d->hwkbTracker.isOpen() && !canHandleHardware) {
+    // Quiet while the map is empty: loadHandlerMap() has not run yet at that
+    // point, and warning then would fire on every startup rather than only on a
+    // device that really has no hardware handler.
+    if (d->hwkbTracker.isOpen() && !canHandleHardware
+        && !d->handlerToPlugin.isEmpty()) {
         qWarning() << "a hardware keyboard is present but no plugin is registered"
                    << "for it; keeping the on-screen keyboard. Set"
                    << (PluginRoot + "/hardware") << "to a plugin to change that.";
