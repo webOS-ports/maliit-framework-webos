@@ -119,7 +119,7 @@ void MAbstractInputMethod::handleAppOrientationChanged(int angle)
 void MAbstractInputMethod::processKeyEvent(QEvent::Type keyType, Qt::Key keyCode,
                                            Qt::KeyboardModifiers modifiers,
                                            const QString &text, bool autoRepeat, int count,
-                                           quint32 /* nativeScanCode */, quint32 /* nativeModifiers */,
+                                           quint32 nativeScanCode, quint32 nativeModifiers,
                                            unsigned long /*time*/)
 {
     if (count < 0 || count > USHRT_MAX) {
@@ -127,8 +127,16 @@ void MAbstractInputMethod::processKeyEvent(QEvent::Type keyType, Qt::Key keyCode
         return;
     }
     // default implementation, just sendKeyEvent back
-    inputMethodHost()->sendKeyEvent(QKeyEvent(keyType, keyCode, modifiers, text, autoRepeat,
-                                              count));
+    //
+    // Carrying the native codes rather than dropping them: this is the path a
+    // key the plugin did not consume takes back out to the application, and
+    // the connection can only hand one back as a real key event - rather than
+    // as a keysym the client may or may not act on - if it still knows which
+    // physical key it was. Keyboard shortcuts depend on that; see
+    // MInputContextWestonIMProtocolConnection::sendKeyEvent.
+    inputMethodHost()->sendKeyEvent(QKeyEvent(keyType, keyCode, modifiers,
+                                              nativeScanCode, 0, nativeModifiers,
+                                              text, autoRepeat, count));
 }
 
 void MAbstractInputMethod::setState(const QSet<Maliit::HandlerState> &state)
