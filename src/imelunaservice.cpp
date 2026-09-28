@@ -658,6 +658,15 @@ QJsonObject IMELunaService::getKeyboardStatusJson() const
     status.insert("hardwareKeyboard", hardware);
     status.insert("onScreenKeyboardForced", m_pluginManager->onScreenKeyboardForced());
 
+    // Whether a text field currently holds the input method's focus. The shell
+    // shows its cut/copy/paste overlay only where there is something to edit,
+    // the way legacy's enyo.EditMenu greyed its own items out
+    // (autoDisableItems). False rather than absent when the connection cannot
+    // say, so a caller never has to tell "no field" from "old server".
+    bool focusValid = false;
+    const bool focused = m_connection ? m_connection->focusState(focusValid) : false;
+    status.insert("inputFocus", focusValid && focused);
+
     return status;
 }
 
