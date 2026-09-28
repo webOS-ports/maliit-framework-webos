@@ -137,7 +137,7 @@ IMELunaService::IMELunaService(QSharedPointer<MInputContextConnection> connectio
     connect(m_broadcastTimer, &QTimer::timeout, this, &IMELunaService::broadcastWidgetState);
     if (m_pluginManager) {
         connect(m_pluginManager, &MIMPluginManager::hardwareKeyboardStatusChanged,
-                this, &IMELunaService::onHardwareKeyboardStatusChanged);
+                this, &IMELunaService::onKeyboardStatusChanged);
     }
 
 }
@@ -300,6 +300,16 @@ void IMELunaService::broadcastWidgetState()
 
     m_focusChangedSinceLastBroadcast = false;
     m_lastWidgetState = widgetState;
+
+    // The keyboard status carries inputFocus, so a field taking or losing the
+    // focus moves it as surely as plugging a keyboard in does - and it is a
+    // different subscription, on a different key, which nothing here was
+    // telling. Subscribers to getKeyboardStatus were left with whatever the
+    // answer had been when they subscribed, which for the shell's cut/copy/
+    // paste overlay meant inputFocus false for ever and an overlay that could
+    // never come up. Cheap to call from here: it compares against the last
+    // status and says nothing when the answer has not moved.
+    onKeyboardStatusChanged();
 }
 
 void IMELunaService::onReset()
@@ -670,7 +680,7 @@ QJsonObject IMELunaService::getKeyboardStatusJson() const
     return status;
 }
 
-void IMELunaService::onHardwareKeyboardStatusChanged()
+void IMELunaService::onKeyboardStatusChanged()
 {
     const QJsonObject status(getKeyboardStatusJson());
 

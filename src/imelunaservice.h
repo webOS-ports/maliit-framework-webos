@@ -55,7 +55,9 @@ protected Q_SLOTS:
 
     //! Tells subscribers when the keyboard status moves, skipping the repeats:
     //! updateInputSource() runs for reasons that have nothing to do with this.
-    void onHardwareKeyboardStatusChanged();
+    //! Called for a focus change as well as a hardware one, because inputFocus
+    //! is part of that status - hence the name without "hardware" in it.
+    void onKeyboardStatusChanged();
 
 protected:
     enum DeleteMode { BackspaceMode, DirectMode, MixedMode };
