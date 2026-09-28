@@ -112,6 +112,7 @@ public:
     virtual QString serviceName() const;
     virtual void setOnScreenKeyboardForced(bool forced);
     virtual void setHardwareKeyboardLayout(const QString &layout);
+    virtual void setHardwareKeyFaceDigits(const QVariantMap &digits);
     // \reimp_end
 
 private:

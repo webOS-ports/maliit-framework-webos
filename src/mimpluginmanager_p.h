@@ -199,6 +199,9 @@ public:
     //! What the active plugin says the attached keyboard's layout is; see
     //! MIMPluginManager::setHardwareKeyboardLayout().
     QString pluginKeyboardLayout;
+    //! What the active plugin says is printed on the key faces; see
+    //! MIMPluginManager::setHardwareKeyFaceDigits().
+    QVariantMap pluginKeyFaceDigits;
     MImSettings *shutDownInterval = nullptr;
     MImSettings *isStaticService = nullptr;
 

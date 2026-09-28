@@ -643,6 +643,12 @@ QJsonObject IMELunaService::getKeyboardStatusJson() const
     // MIMPluginManager::hardwareKeyboardLayout(). Always present as a key so a
     // caller does not have to tell "not declared" from "old server".
     hardware.insert("layout", m_pluginManager->hardwareKeyboardLayout());
+    // What the key faces say, for callers that take digits without going through
+    // an input method at all - the lock screen's PIN pad is the shell's own QML,
+    // running inside the compositor, so no plugin ever sees its keys. Keyed by
+    // evdev scancode as a string.
+    hardware.insert("keyFaceDigits",
+                    QJsonObject::fromVariantMap(m_pluginManager->hardwareKeyFaceDigits()));
 
     status.insert("hardwareKeyboard", hardware);
     status.insert("onScreenKeyboardForced", m_pluginManager->onScreenKeyboardForced());

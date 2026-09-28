@@ -282,6 +282,11 @@ void MInputMethodHost::setHardwareKeyboardLayout(const QString &layout)
     pluginManager->setHardwareKeyboardLayout(layout);
 }
 
+void MInputMethodHost::setHardwareKeyFaceDigits(const QVariantMap &digits)
+{
+    pluginManager->setHardwareKeyFaceDigits(digits);
+}
+
 int MInputMethodHost::instanceId() const
 {
     return MImGlobalSettings::instance()->getInstanceId();

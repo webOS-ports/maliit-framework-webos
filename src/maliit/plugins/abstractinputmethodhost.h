@@ -18,6 +18,7 @@
 #define MABSTRACTINPUTMETHODHOST_H
 
 #include <QRect>
+#include <QVariantMap>
 #include <QObject>
 #include <QPixmap>
 #include <QVariant>
@@ -393,6 +394,18 @@ public:
      * keyboard has no layout to be told about.
      */
     virtual void setHardwareKeyboardLayout(const QString &layout) { Q_UNUSED(layout); }
+
+    /*!
+     * \brief Tells the framework the digits printed on the keyboard's key faces.
+     *
+     * Reported onward for the things that take digits without an input method at
+     * all - the lock screen's PIN pad is the shell's own QML, running inside the
+     * compositor, so no plugin ever sees its keys. Offered by the plugin because
+     * the plugin is what identified the keyboard and holds its key map.
+     *
+     * Keyed by evdev scancode as a string, since it crosses a JSON boundary.
+     */
+    virtual void setHardwareKeyFaceDigits(const QVariantMap &digits) { Q_UNUSED(digits); }
 
 private:
     Q_DISABLE_COPY(MAbstractInputMethodHost)

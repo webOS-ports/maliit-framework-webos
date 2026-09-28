@@ -1566,6 +1566,28 @@ QString MIMPluginManager::hardwareKeyboardLayout() const
     return declaredKeyboardLayout();
 }
 
+QVariantMap MIMPluginManager::hardwareKeyFaceDigits() const
+{
+    Q_D(const MIMPluginManager);
+
+    return d->pluginKeyFaceDigits;
+}
+
+void MIMPluginManager::setHardwareKeyFaceDigits(const QVariantMap &digits)
+{
+    Q_D(MIMPluginManager);
+
+    if (d->pluginKeyFaceDigits == digits)
+        return;
+
+    d->pluginKeyFaceDigits = digits;
+
+    qInfo() << "the active plugin reports" << digits.size()
+            << "digits printed on the keyboard's key faces";
+
+    Q_EMIT hardwareKeyboardStatusChanged();
+}
+
 void MIMPluginManager::setHardwareKeyboardLayout(const QString &layout)
 {
     Q_D(MIMPluginManager);

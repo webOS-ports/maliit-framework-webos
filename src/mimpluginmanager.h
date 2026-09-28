@@ -156,6 +156,14 @@ public:
      */
     QString hardwareKeyboardLayout() const;
 
+    /*! \brief The digits printed on the keyboard's key faces, by scancode.
+     *
+     * Empty unless a plugin has said. For the things that take digits without an
+     * input method - the lock screen's PIN pad runs inside the compositor, where
+     * no plugin ever sees the keys, so it substitutes them itself.
+     */
+    QVariantMap hardwareKeyFaceDigits() const;
+
     /*! \brief The layout this device declares, ignoring the settings override.
      *
      * Read from a file rather than a setting because it is a fact about the
@@ -178,6 +186,9 @@ public Q_SLOTS:
      * plugin only knows it by having matched the input device. Empty clears it.
      */
     void setHardwareKeyboardLayout(const QString &layout);
+
+    //! \brief Records the digits the active plugin read off the key faces.
+    void setHardwareKeyFaceDigits(const QVariantMap &digits);
 
     //! Show active plugins.
     void showActivePlugins();
