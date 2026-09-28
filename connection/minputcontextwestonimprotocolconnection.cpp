@@ -55,7 +55,10 @@ const char * const OnScreenKeyboardAttribute = "onScreenKeyboardAllowed";
 
 /*
  * webOS reserves this bit of the content hint for "this field does not want an
- * on-screen keyboard", from Qt::ImhNoOnScreenKeyboard.
+ * on-screen keyboard".
+ *
+ * Qt has no hint for that, so a field says it with a bit of its own, which
+ * qtwayland-webos turns into this one; the two are documented together there.
  *
  * text.xml stops at MULTILINE (0x200) and this is the next bit up. It is not in
  * the enum on purpose: the hint crosses the wire as a plain uint and the

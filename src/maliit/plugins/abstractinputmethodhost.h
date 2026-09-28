@@ -86,8 +86,7 @@ public:
 
     /*!
      * \brief returns whether the focused field will accept an on-screen
-     * keyboard, from Qt::ImhNoOnScreenKeyboard, if output parameter valid is
-     * true.
+     * keyboard, if output parameter valid is true.
      *
      * A field that has a keypad of its own -- a dialer, a PIN pad -- needs the
      * input method to know about it, for the content type and so that a
