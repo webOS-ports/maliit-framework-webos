@@ -81,6 +81,11 @@ public:
      */
     virtual bool predictionEnabled(bool &valid);
 
+    //! \brief returns whether the focused field will accept an on-screen
+    //!        keyboard, from Qt::ImhNoOnScreenKeyboard. True where the field
+    //!        said nothing.
+    virtual bool onScreenKeyboardAllowed(bool &valid);
+
     /*!
      * \brief returns input method auto-capitalization hint if output parameter valid is true.
      */

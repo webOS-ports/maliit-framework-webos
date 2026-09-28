@@ -85,6 +85,23 @@ public:
     virtual bool autoCapitalizationEnabled(bool &valid) = 0;
 
     /*!
+     * \brief returns whether the focused field will accept an on-screen
+     * keyboard, from Qt::ImhNoOnScreenKeyboard, if output parameter valid is
+     * true.
+     *
+     * A field that has a keypad of its own -- a dialer, a PIN pad -- needs the
+     * input method to know about it, for the content type and so that a
+     * physical keyboard's keys are redirected here, while wanting nothing
+     * drawn on screen. Those two used to be the same thing: the platform input
+     * context activates the text model when a field takes focus, and
+     * activation is what puts the keys up.
+     *
+     * Not pure, and true by default: an input method host that predates this,
+     * or a field that says nothing, behaves exactly as it always has.
+     */
+    virtual bool onScreenKeyboardAllowed(bool &valid) { valid = false; return true; }
+
+    /*!
      * \brief get surrounding text and cursor position information
      */
     virtual bool surroundingText(QString &text, int &cursorPosition) = 0;

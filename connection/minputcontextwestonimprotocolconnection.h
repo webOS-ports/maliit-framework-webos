@@ -43,6 +43,7 @@ public:
     virtual int enterKeyType(bool &valid);
     virtual bool correctionEnabled(bool &valid);
     virtual bool predictionEnabled(bool &valid);
+    virtual bool onScreenKeyboardAllowed(bool &valid);
     virtual bool autoCapitalizationEnabled(bool &valid);
     virtual bool surroundingText(QString &text, int &cursor_position);
     virtual bool hasSelection(bool &valid);

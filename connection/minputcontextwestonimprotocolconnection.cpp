@@ -51,6 +51,19 @@ const char * const AnchorPositionAttribute = "anchorPosition";
 const char * const CursorPositionAttribute = "cursorPosition";
 const char * const HasSelectionAttribute = "hasSelection";
 const char * const HiddenTextAttribute = "hiddenText";
+const char * const OnScreenKeyboardAttribute = "onScreenKeyboardAllowed";
+
+/*
+ * webOS reserves this bit of the content hint for "this field does not want an
+ * on-screen keyboard", from Qt::ImhNoOnScreenKeyboard.
+ *
+ * text.xml stops at MULTILINE (0x200) and this is the next bit up. It is not in
+ * the enum on purpose: the hint crosses the wire as a plain uint and the
+ * compositor relays set_content_type to content_type without inspecting it, so
+ * a bit past the end of the enum arrives here untouched and costs no protocol
+ * change. qtwayland-webos sets it; keep the two in step.
+ */
+const uint32_t ContentHintNoInputPanel = 0x400;
 const char * const MaxTextLengthAttribute = "maxTextLength";
 const char * const PlatformDataAttribute = "platformData";
 
@@ -1281,6 +1294,7 @@ void MInputContextWestonIMProtocolConnectionPrivate::handleInputMethodActivate(i
     //Even if user hasn't set these property, followings should have a default value.
     //See GlobalInputMethod::show() in imemanager.
     state_info[ContentTypeAttribute] = Maliit::FreeTextContentType;
+    state_info[OnScreenKeyboardAttribute] = true;
     state_info[EnterKeyTypeAttribute] = Maliit::DefaultEnterKeyType;
 
     q->updateWidgetInformation(connection_id, state_info, true);
@@ -1400,6 +1414,9 @@ void MInputContextWestonIMProtocolConnectionPrivate::handleInputMethodContextCon
     state_info[AutoCapitalizationAttribute] = matchesFlag(hint, TEXT_MODEL_CONTENT_HINT_AUTO_CAPITALIZATION);
     state_info[CorrectionAttribute] = matchesFlag(hint, TEXT_MODEL_CONTENT_HINT_AUTO_CORRECTION);
     state_info[PredictionAttribute] = matchesFlag(hint, TEXT_MODEL_CONTENT_HINT_AUTO_COMPLETION);
+    // Reversed, because the hint names the refusal and the attribute names the
+    // permission: a field that says nothing gets a keyboard, as it always did.
+    state_info[OnScreenKeyboardAttribute] = !matchesFlag(hint, ContentHintNoInputPanel);
     state_info[HiddenTextAttribute] = matchesFlag(hint, TEXT_MODEL_CONTENT_HINT_HIDDEN_TEXT)
         || matchesFlag(hint, TEXT_MODEL_CONTENT_HINT_PASSWORD)
         || matchesFlag(hint, TEXT_MODEL_CONTENT_HINT_SENSITIVE_DATA)
@@ -1566,6 +1583,13 @@ bool MInputContextWestonIMProtocolConnection::predictionEnabled(bool &valid)
 {
     qDebug() << "valid:" << valid;
     bool result = MInputContextConnection::predictionEnabled(valid);
+    return result;
+}
+
+bool MInputContextWestonIMProtocolConnection::onScreenKeyboardAllowed(bool &valid)
+{
+    qDebug() << "valid:" << valid;
+    bool result = MInputContextConnection::onScreenKeyboardAllowed(valid);
     return result;
 }
 

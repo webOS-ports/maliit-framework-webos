@@ -74,6 +74,11 @@ bool MInputMethodHost::predictionEnabled(bool &valid)
     return connection->predictionEnabled(valid);
 }
 
+bool MInputMethodHost::onScreenKeyboardAllowed(bool &valid)
+{
+    return connection->onScreenKeyboardAllowed(valid);
+}
+
 bool MInputMethodHost::autoCapitalizationEnabled(bool &valid)
 {
     return connection->autoCapitalizationEnabled(valid);
