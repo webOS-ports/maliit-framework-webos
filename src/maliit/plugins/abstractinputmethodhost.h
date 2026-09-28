@@ -363,6 +363,21 @@ public:
      */
     virtual void setOnScreenKeyboardForced(bool forced) { Q_UNUSED(forced); }
 
+    /*!
+     * \brief Tells the framework the layout printed on the attached keyboard.
+     *
+     * QWERTY, QWERTZ, AZERTY and the two localised variants legacy named, or
+     * empty for "not stated". Offered to the plugin because the plugin is what
+     * identifies the keyboard: it matches the input device's name against its own
+     * profiles, and on a phone sold with several keyboards - the BlackBerry KEY2 -
+     * the name is the only thing that tells them apart. The device's own
+     * declaration covers the keyboards no profile matches.
+     *
+     * Not pure, and a no-op by default: a host with no notion of a hardware
+     * keyboard has no layout to be told about.
+     */
+    virtual void setHardwareKeyboardLayout(const QString &layout) { Q_UNUSED(layout); }
+
 private:
     Q_DISABLE_COPY(MAbstractInputMethodHost)
     Q_DECLARE_PRIVATE(MAbstractInputMethodHost)

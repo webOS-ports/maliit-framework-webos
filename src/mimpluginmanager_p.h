@@ -196,6 +196,9 @@ public:
     MImSettings *hwkbForcedConf = nullptr;
     MImSettings *hwkbKeypadConf = nullptr;
     MImSettings *hwkbLayoutConf = nullptr;
+    //! What the active plugin says the attached keyboard's layout is; see
+    //! MIMPluginManager::setHardwareKeyboardLayout().
+    QString pluginKeyboardLayout;
     MImSettings *shutDownInterval = nullptr;
     MImSettings *isStaticService = nullptr;
 

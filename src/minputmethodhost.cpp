@@ -272,6 +272,11 @@ void MInputMethodHost::setOnScreenKeyboardForced(bool forced)
     pluginManager->setOnScreenKeyboardForced(forced);
 }
 
+void MInputMethodHost::setHardwareKeyboardLayout(const QString &layout)
+{
+    pluginManager->setHardwareKeyboardLayout(layout);
+}
+
 int MInputMethodHost::instanceId() const
 {
     return MImGlobalSettings::instance()->getInstanceId();

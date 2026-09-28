@@ -171,6 +171,14 @@ public:
 public Q_SLOTS:
     void setOnScreenKeyboardForced(bool forced);
 
+    /*! \brief Records the layout the active plugin identified, and reports it on.
+     *
+     * Preferred over the device's declaration because it names the keyboard that
+     * is actually attached rather than the one the device usually has, and a
+     * plugin only knows it by having matched the input device. Empty clears it.
+     */
+    void setHardwareKeyboardLayout(const QString &layout);
+
     //! Show active plugins.
     void showActivePlugins();
 

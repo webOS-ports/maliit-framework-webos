@@ -110,6 +110,7 @@ public:
     virtual QString appId() const;
     virtual QString serviceName() const;
     virtual void setOnScreenKeyboardForced(bool forced);
+    virtual void setHardwareKeyboardLayout(const QString &layout);
     // \reimp_end
 
 private:

@@ -1544,9 +1544,9 @@ QString MIMPluginManager::hardwareKeyboardLayout() const
 {
     Q_D(const MIMPluginManager);
 
-    // The setting wins where it is set, so a preference - or a test - can
-    // override the hardware. Empty is the default, and then the device's own
-    // declaration stands.
+    // Three sources, most specific first.
+    //
+    // The setting, so a preference - or a test - can override the hardware.
     if (d->hwkbLayoutConf) {
         const QString configured(d->hwkbLayoutConf->value().toString().trimmed());
 
@@ -1554,7 +1554,33 @@ QString MIMPluginManager::hardwareKeyboardLayout() const
             return configured;
     }
 
+    // Then the plugin, which named the keyboard by matching the input device it
+    // is attached to. More specific than the device's declaration: a BlackBerry
+    // KEY2 is sold with three different keyboards and one adaptation covers all
+    // of them.
+    if (!d->pluginKeyboardLayout.isEmpty())
+        return d->pluginKeyboardLayout;
+
+    // Then what the device declares for the keyboard it usually has, which is the
+    // only answer for a keyboard no plugin has a profile for.
     return declaredKeyboardLayout();
+}
+
+void MIMPluginManager::setHardwareKeyboardLayout(const QString &layout)
+{
+    Q_D(MIMPluginManager);
+
+    const QString trimmed(layout.trimmed());
+
+    if (d->pluginKeyboardLayout == trimmed)
+        return;
+
+    d->pluginKeyboardLayout = trimmed;
+
+    qInfo() << "the active plugin reports the hardware keyboard layout as"
+            << (trimmed.isEmpty() ? QStringLiteral("(not stated)") : trimmed);
+
+    Q_EMIT hardwareKeyboardStatusChanged();
 }
 
 bool MIMPluginManager::onScreenKeyboardForced() const

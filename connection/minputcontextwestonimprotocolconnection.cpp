@@ -910,6 +910,31 @@ inputMethodKeyboardModifiers(void *data,
     d->processKeyModifiers(serial, mods_depressed, mods_latched, mods_locked, group);
 }
 
+void
+inputMethodKeyboardRepeatInfo(void *data,
+                       struct wl_keyboard *wl_keyboard,
+                       int32_t rate,
+                       int32_t delay)
+{
+    Q_UNUSED(data);
+    Q_UNUSED(wl_keyboard);
+
+    // Handled by being ignored, deliberately, but it must not be a null pointer
+    // in the listener: libwayland-client calls whatever entry the event maps to,
+    // so a null there is a crash the moment a compositor advertises a rate. It
+    // used to be unreachable because the compositor advertised 0 and the grabbed
+    // keyboard's interface version predates the event; neither is a safe thing to
+    // depend on.
+    //
+    // Ignored because the repeat this needs is already arriving. A grabbed
+    // keyboard receives the kernel's own repeat events as further presses - see
+    // WebOSSurfaceItem::processKeyEvent, which forwards them to a grab and to
+    // nothing else - and each one becomes a character the ordinary way. A timer
+    // here would repeat a second time over the top of that.
+    qDebug() << "compositor advertises key repeat" << rate << "Hz after" << delay
+             << "ms; repeat arrives as the grabbed keyboard's own events instead";
+}
+
 } // namespace
 
 const wl_keyboard_listener input_method_keyboard_listener = {
@@ -918,7 +943,7 @@ const wl_keyboard_listener input_method_keyboard_listener = {
     nullptr, /* leave */
     inputMethodKeyboardKey,
     inputMethodKeyboardModifiers,
-    nullptr  /* repeat_info */
+    inputMethodKeyboardRepeatInfo
 };
 
 void MInputContextWestonIMProtocolConnectionPrivate::processKeyMap(uint32_t format, int fd, uint32_t size)
