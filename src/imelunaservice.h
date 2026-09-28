@@ -77,6 +77,8 @@ protected:
     static bool handleSendEnterKey(LSHandle *handle, LSMessage *message, void *data);
     static bool handleGetKeyboardStatus(LSHandle *handle, LSMessage *message, void *data);
     static bool handleSetOnScreenKeyboardForced(LSHandle *handle, LSMessage *message, void *data);
+    static bool handleSetHardwareKeyboardLayout(LSHandle *handle, LSMessage *message, void *data);
+    static bool handleSetTelephoneKeypadCounts(LSHandle *handle, LSMessage *message, void *data);
 
     static bool handleSubscriptionCancel(LSHandle *handle, LSMessage *message, void *data);
 

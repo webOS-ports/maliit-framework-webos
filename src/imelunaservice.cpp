@@ -647,6 +647,11 @@ QJsonObject IMELunaService::getKeyboardStatusJson() const
     // an input method at all - the lock screen's PIN pad is the shell's own QML,
     // running inside the compositor, so no plugin ever sees its keys. Keyed by
     // evdev scancode as a string.
+    // What has been set, as opposed to what is in force: "layout" above is the
+    // answer after the plugin and the device's declaration have had their say,
+    // and a settings page needs to show which of those is being overridden.
+    hardware.insert("layoutOverride", m_pluginManager->keyboardLayoutOverride());
+    hardware.insert("keypadCounts", m_pluginManager->telephoneKeypadCounts());
     hardware.insert("keyFaceDigits",
                     QJsonObject::fromVariantMap(m_pluginManager->hardwareKeyFaceDigits()));
 
@@ -748,6 +753,78 @@ bool IMELunaService::handleSetOnScreenKeyboardForced(LSHandle *handle, LSMessage
     return true;
 }
 
+//! \brief Says what layout the attached keyboard has, when nothing can tell.
+//!
+//! A USB or Bluetooth keyboard carries its layout in the compositor's xkb keymap
+//! and a phone's own keyboard is identified by its profile, but neither covers
+//! every case - so this is the way for somebody to state it. An empty string
+//! restores "work it out".
+bool IMELunaService::handleSetHardwareKeyboardLayout(LSHandle *handle, LSMessage *message, void *data)
+{
+    Q_UNUSED(handle);
+
+    IMELunaService *service = static_cast<IMELunaService *>(data);
+
+    LSMessageAdapter msg(message);
+
+    if (!service->m_pluginManager) {
+        msg.replyError("No plugin manager; the keyboard layout cannot be set");
+        return true;
+    }
+
+    const QJsonObject payload(msg.getPayload());
+    const QJsonValue layout(payload.value(QStringLiteral("layout")));
+
+    if (!layout.isString()) {
+        msg.replyError("\"layout\" is required and must be a string;"
+                       " an empty one lets the hardware decide");
+        return true;
+    }
+
+    service->m_pluginManager->setKeyboardLayoutOverride(layout.toString());
+
+    QJsonObject response(service->getKeyboardStatusJson());
+    response.insert("returnValue", true);
+    msg.respond(response);
+
+    return true;
+}
+
+//! \brief Whether a telephone keypad counts as a hardware keyboard.
+//!
+//! Off by default, because a keypad has the digits and none of the letters:
+//! taking the on-screen keyboard away for one leaves no way to type a word. On a
+//! device whose keypad is meant to be typed on by multi-tap, it is the point.
+bool IMELunaService::handleSetTelephoneKeypadCounts(LSHandle *handle, LSMessage *message, void *data)
+{
+    Q_UNUSED(handle);
+
+    IMELunaService *service = static_cast<IMELunaService *>(data);
+
+    LSMessageAdapter msg(message);
+
+    if (!service->m_pluginManager) {
+        msg.replyError("No plugin manager; telephone keypads cannot be configured");
+        return true;
+    }
+
+    const QJsonObject payload(msg.getPayload());
+    const QJsonValue counts(payload.value(QStringLiteral("counts")));
+
+    if (!counts.isBool()) {
+        msg.replyError("\"counts\" is required and must be a boolean");
+        return true;
+    }
+
+    service->m_pluginManager->setTelephoneKeypadCounts(counts.toBool());
+
+    QJsonObject response(service->getKeyboardStatusJson());
+    response.insert("returnValue", true);
+    msg.respond(response);
+
+    return true;
+}
+
 LSMethod IMELunaService::ime_bus_methods [] = {
     // Handlers for service methods for com.webos.service.ime
     {"registerRemoteKeyboard", IMELunaService::handleRegisterRemoteKeyboard, (LSMethodFlags) 0},
@@ -756,6 +833,8 @@ LSMethod IMELunaService::ime_bus_methods [] = {
     {"sendEnterKey", IMELunaService::handleSendEnterKey, (LSMethodFlags) 0},
     {"getKeyboardStatus", IMELunaService::handleGetKeyboardStatus, (LSMethodFlags) 0},
     {"setOnScreenKeyboardForced", IMELunaService::handleSetOnScreenKeyboardForced, (LSMethodFlags) 0},
+    {"setHardwareKeyboardLayout", IMELunaService::handleSetHardwareKeyboardLayout, (LSMethodFlags) 0},
+    {"setTelephoneKeypadCounts", IMELunaService::handleSetTelephoneKeypadCounts, (LSMethodFlags) 0},
 
     {nullptr, nullptr, (LSMethodFlags) 0}
 };

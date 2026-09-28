@@ -1573,6 +1573,70 @@ QVariantMap MIMPluginManager::hardwareKeyFaceDigits() const
     return d->pluginKeyFaceDigits;
 }
 
+QString MIMPluginManager::keyboardLayoutOverride() const
+{
+    Q_D(const MIMPluginManager);
+
+    if (!d->hwkbLayoutConf)
+        return QString();
+
+    return d->hwkbLayoutConf->value().toString().trimmed();
+}
+
+void MIMPluginManager::setKeyboardLayoutOverride(const QString &layout)
+{
+    Q_D(MIMPluginManager);
+
+    if (!d->hwkbLayoutConf) {
+        qWarning() << "asked to set the keyboard layout before the settings exist";
+        return;
+    }
+
+    const QString trimmed(layout.trimmed());
+
+    if (keyboardLayoutOverride() == trimmed)
+        return;
+
+    d->hwkbLayoutConf->set(trimmed);
+
+    qInfo() << "the hardware keyboard layout is now"
+            << (trimmed.isEmpty() ? QStringLiteral("(decided by the hardware)") : trimmed);
+
+    // The setting's own change notification is connected, but a write from
+    // inside this process is not guaranteed to come back as one - the same
+    // reason setOnScreenKeyboardForced() applies its own change.
+    Q_EMIT hardwareKeyboardStatusChanged();
+}
+
+bool MIMPluginManager::telephoneKeypadCounts() const
+{
+    Q_D(const MIMPluginManager);
+
+    return d->hwkbKeypadConf && d->hwkbKeypadConf->value(false).toBool();
+}
+
+void MIMPluginManager::setTelephoneKeypadCounts(bool counts)
+{
+    Q_D(MIMPluginManager);
+
+    if (!d->hwkbKeypadConf) {
+        qWarning() << "asked about telephone keypads before the settings exist";
+        return;
+    }
+
+    if (telephoneKeypadCounts() == counts)
+        return;
+
+    d->hwkbKeypadConf->set(counts);
+
+    qInfo() << "a telephone keypad" << (counts ? "now counts" : "no longer counts")
+            << "as a hardware keyboard";
+
+    // Unlike the layout, this one moves the answer: it decides which kinds the
+    // tracker accepts, and so whether the on-screen keyboard is taken away.
+    updateHwKeyboardPolicy();
+}
+
 void MIMPluginManager::setHardwareKeyFaceDigits(const QVariantMap &digits)
 {
     Q_D(MIMPluginManager);

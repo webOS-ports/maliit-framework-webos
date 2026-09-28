@@ -164,6 +164,12 @@ public:
      */
     QVariantMap hardwareKeyFaceDigits() const;
 
+    //! \brief The layout override, or empty when the hardware decides.
+    QString keyboardLayoutOverride() const;
+
+    //! \brief Whether a telephone keypad counts as a hardware keyboard.
+    bool telephoneKeypadCounts() const;
+
     /*! \brief The layout this device declares, ignoring the settings override.
      *
      * Read from a file rather than a setting because it is a fact about the
@@ -189,6 +195,23 @@ public Q_SLOTS:
 
     //! \brief Records the digits the active plugin read off the key faces.
     void setHardwareKeyFaceDigits(const QVariantMap &digits);
+
+    /*! \brief Overrides the layout the keyboard is taken to have.
+     *
+     * Empty restores "work it out" - the plugin's answer, then the device's own
+     * declaration. For the keyboard nothing can identify: a USB or Bluetooth one
+     * carries its layout in the compositor's xkb keymap, which is nowhere this
+     * can see, so somebody has to be able to say.
+     */
+    void setKeyboardLayoutOverride(const QString &layout);
+
+    /*! \brief Whether a telephone keypad counts as a hardware keyboard.
+     *
+     * Off by default: a keypad has the digits and no letters, so taking the
+     * on-screen keyboard away for one leaves no way to type a word. On a device
+     * whose keypad is meant to be typed on by multi-tap, it is the whole point.
+     */
+    void setTelephoneKeypadCounts(bool counts);
 
     //! Show active plugins.
     void showActivePlugins();

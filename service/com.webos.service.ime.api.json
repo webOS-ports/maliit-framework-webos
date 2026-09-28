@@ -4,7 +4,9 @@
         "com.webos.service.ime/insertText",
         "com.webos.service.ime/registerRemoteKeyboard",
         "com.webos.service.ime/sendEnterKey",
-        "com.webos.service.ime/setOnScreenKeyboardForced"
+        "com.webos.service.ime/setOnScreenKeyboardForced",
+        "com.webos.service.ime/setHardwareKeyboardLayout",
+        "com.webos.service.ime/setTelephoneKeypadCounts"
     ],
     "ime.query": [
         "com.webos.service.ime/getKeyboardStatus"
