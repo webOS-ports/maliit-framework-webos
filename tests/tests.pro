@@ -10,6 +10,9 @@ SUBDIRS = \
     ut_keyoverridedata \
     ut_mattributeextensionid \
     ut_mattributeextensionmanager \
+    ut_mimhwkeyboardtracker \
+    ut_miminputdevices \
+    ut_mimkeyboardkind \
     ut_mimonscreenplugins \
     ut_mimserveroptions \
     ut_mimsettings \

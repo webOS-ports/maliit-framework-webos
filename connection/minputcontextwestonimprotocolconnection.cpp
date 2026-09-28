@@ -51,6 +51,22 @@ const char * const AnchorPositionAttribute = "anchorPosition";
 const char * const CursorPositionAttribute = "cursorPosition";
 const char * const HasSelectionAttribute = "hasSelection";
 const char * const HiddenTextAttribute = "hiddenText";
+const char * const OnScreenKeyboardAttribute = "onScreenKeyboardAllowed";
+
+/*
+ * webOS reserves this bit of the content hint for "this field does not want an
+ * on-screen keyboard".
+ *
+ * Qt has no hint for that, so a field says it with a bit of its own, which
+ * qtwayland-webos turns into this one; the two are documented together there.
+ *
+ * text.xml stops at MULTILINE (0x200) and this is the next bit up. It is not in
+ * the enum on purpose: the hint crosses the wire as a plain uint and the
+ * compositor relays set_content_type to content_type without inspecting it, so
+ * a bit past the end of the enum arrives here untouched and costs no protocol
+ * change. qtwayland-webos sets it; keep the two in step.
+ */
+const uint32_t ContentHintNoInputPanel = 0x400;
 const char * const MaxTextLengthAttribute = "maxTextLength";
 const char * const PlatformDataAttribute = "platformData";
 
@@ -910,6 +926,31 @@ inputMethodKeyboardModifiers(void *data,
     d->processKeyModifiers(serial, mods_depressed, mods_latched, mods_locked, group);
 }
 
+void
+inputMethodKeyboardRepeatInfo(void *data,
+                       struct wl_keyboard *wl_keyboard,
+                       int32_t rate,
+                       int32_t delay)
+{
+    Q_UNUSED(data);
+    Q_UNUSED(wl_keyboard);
+
+    // Handled by being ignored, deliberately, but it must not be a null pointer
+    // in the listener: libwayland-client calls whatever entry the event maps to,
+    // so a null there is a crash the moment a compositor advertises a rate. It
+    // used to be unreachable because the compositor advertised 0 and the grabbed
+    // keyboard's interface version predates the event; neither is a safe thing to
+    // depend on.
+    //
+    // Ignored because the repeat this needs is already arriving. A grabbed
+    // keyboard receives the kernel's own repeat events as further presses - see
+    // WebOSSurfaceItem::processKeyEvent, which forwards them to a grab and to
+    // nothing else - and each one becomes a character the ordinary way. A timer
+    // here would repeat a second time over the top of that.
+    qDebug() << "compositor advertises key repeat" << rate << "Hz after" << delay
+             << "ms; repeat arrives as the grabbed keyboard's own events instead";
+}
+
 } // namespace
 
 const wl_keyboard_listener input_method_keyboard_listener = {
@@ -918,7 +959,7 @@ const wl_keyboard_listener input_method_keyboard_listener = {
     nullptr, /* leave */
     inputMethodKeyboardKey,
     inputMethodKeyboardModifiers,
-    nullptr  /* repeat_info */
+    inputMethodKeyboardRepeatInfo
 };
 
 void MInputContextWestonIMProtocolConnectionPrivate::processKeyMap(uint32_t format, int fd, uint32_t size)
@@ -1256,6 +1297,7 @@ void MInputContextWestonIMProtocolConnectionPrivate::handleInputMethodActivate(i
     //Even if user hasn't set these property, followings should have a default value.
     //See GlobalInputMethod::show() in imemanager.
     state_info[ContentTypeAttribute] = Maliit::FreeTextContentType;
+    state_info[OnScreenKeyboardAttribute] = true;
     state_info[EnterKeyTypeAttribute] = Maliit::DefaultEnterKeyType;
 
     q->updateWidgetInformation(connection_id, state_info, true);
@@ -1375,6 +1417,9 @@ void MInputContextWestonIMProtocolConnectionPrivate::handleInputMethodContextCon
     state_info[AutoCapitalizationAttribute] = matchesFlag(hint, TEXT_MODEL_CONTENT_HINT_AUTO_CAPITALIZATION);
     state_info[CorrectionAttribute] = matchesFlag(hint, TEXT_MODEL_CONTENT_HINT_AUTO_CORRECTION);
     state_info[PredictionAttribute] = matchesFlag(hint, TEXT_MODEL_CONTENT_HINT_AUTO_COMPLETION);
+    // Reversed, because the hint names the refusal and the attribute names the
+    // permission: a field that says nothing gets a keyboard, as it always did.
+    state_info[OnScreenKeyboardAttribute] = !matchesFlag(hint, ContentHintNoInputPanel);
     state_info[HiddenTextAttribute] = matchesFlag(hint, TEXT_MODEL_CONTENT_HINT_HIDDEN_TEXT)
         || matchesFlag(hint, TEXT_MODEL_CONTENT_HINT_PASSWORD)
         || matchesFlag(hint, TEXT_MODEL_CONTENT_HINT_SENSITIVE_DATA)
@@ -1541,6 +1586,13 @@ bool MInputContextWestonIMProtocolConnection::predictionEnabled(bool &valid)
 {
     qDebug() << "valid:" << valid;
     bool result = MInputContextConnection::predictionEnabled(valid);
+    return result;
+}
+
+bool MInputContextWestonIMProtocolConnection::onScreenKeyboardAllowed(bool &valid)
+{
+    qDebug() << "valid:" << valid;
+    bool result = MInputContextConnection::onScreenKeyboardAllowed(valid);
     return result;
 }
 

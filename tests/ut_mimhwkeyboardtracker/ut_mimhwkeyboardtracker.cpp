@@ -1,0 +1,341 @@
+/* * This file is part of Maliit framework *
+ *
+ * Copyright (C) 2026 Herman van Hazendonk <github.com@herrie.org>
+ *
+ * Contact: maliit-discuss@lists.maliit.org
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License version 2.1 as published by the Free Software Foundation
+ * and appearing in the file LICENSE.LGPL included in the packaging
+ * of this file.
+ */
+
+// The transitions, which are what the rest of the stack reacts to. A keyboard
+// that goes away mid-sentence - a PineTab2's, a USB or a Bluetooth one - has to
+// bring the on-screen keyboard back for the field that is focused right now, so
+// stateChanged() has to fire exactly when the answer moves and not otherwise.
+//
+// The device list is driven through MALIIT_HW_INPUT_DEVICES rather than by
+// plugging things in, and refresh() stands in for the udev event.
+
+#include "mimhwkeyboardtracker.h"
+#include "mimkeyboardkind.h"
+
+#include <QtTest>
+
+namespace {
+
+const char *const KeyboardBlock =
+    "N: Name=\"AT Translated Set 2 keyboard\"\n"
+    "S: Sysfs=/devices/platform/i8042/serio0/input/input2\n"
+    "H: Handlers=sysrq kbd event2 leds \n"
+    "B: KEY=402000000 3803078f800d001 feffffdfffefffff fffffffffffffffe\n"
+    "\n";
+
+const char *const PowerButtonBlock =
+    "N: Name=\"Power Button\"\n"
+    "S: Sysfs=/devices/LNXSYSTM:00/LNXPWRBN:00/input/input0\n"
+    "H: Handlers=kbd event0 \n"
+    "B: KEY=10000000000000 0\n"
+    "\n";
+
+const char *const KeypadBlock =
+    "N: Name=\"mtk-tpd-kpd\"\n"
+    "S: Sysfs=/devices/platform/mtk-kpd/input/input3\n"
+    "H: Handlers=kbd event3 \n"
+    "B: KEY=800 0 0 0 0 0 0 0 0 8 0 0 0 1c0000 0 0 ffc\n"
+    "\n";
+
+//! A Zinwa Q25, copied off the device. Worth having verbatim rather than
+//! reduced to a synthetic case: it is the device this detection was written for,
+//! its keyboard is resolved in the kernel by bbqX0kbd so webos-keyboard
+//! deliberately ships no profile for it, and its headset jack advertises four
+//! EV_SW codes - which is exactly the shape that must not be mistaken for a
+//! keyboard-presence switch.
+const char *const Q25Devices =
+    "I: Bus=0000 Vendor=0000 Product=0000 Version=0000\n"
+    "N: Name=\"mtk-pmic-keys\"\n"
+    "S: Sysfs=/devices/platform/soc/10026000.pwrap/10026000.pwrap:mt6366/mtk-pmic-keys/input/input0\n"
+    "H: Handlers=kbd event0 \n"
+    "B: KEY=18000000000000 0\n"
+    "\n"
+    "N: Name=\"mtk-kpd\"\n"
+    "S: Sysfs=/devices/platform/soc/10010000.kp/input/input1\n"
+    "H: Handlers=kbd event1 \n"
+    "B: KEY=6000000000000 0\n"
+    "\n"
+    "N: Name=\"Q25_keyboard\"\n"
+    "P: Phys=\n"
+    "S: Sysfs=/devices/platform/soc/1101a000.i2c/i2c-6/6-001f/input/input2\n"
+    "H: Handlers=kbd event2 \n"
+    "B: KEY=10 0 0 0 0 30000 8000000000 100040000000 e96d000000000 37fffffdffffffe\n"
+    "\n"
+    "N: Name=\"s2716b_ts\"\n"
+    "S: Sysfs=/devices/platform/soc/11e00000.i2c/i2c-0/0-0067/input/input3\n"
+    "H: Handlers=event3 \n"
+    "B: KEY=420 0 0 0 0 0\n"
+    "\n"
+    "N: Name=\"mt6789-mt6366 Headset Jack\"\n"
+    "P: Phys=ALSA\n"
+    "S: Sysfs=/devices/platform/soc/soc:sound/sound/card0/input5\n"
+    "H: Handlers=kbd event4\n"
+    "B: KEY=40 0 0 0 0 0 0 1000000000 c000000000000 0\n"
+    "B: SW=d4\n"
+    "\n";
+
+const char *const VirtualKeyboardBlock =
+    "N: Name=\"RustDesk UInput Keyboard\"\n"
+    "S: Sysfs=/devices/virtual/input/input481\n"
+    "H: Handlers=sysrq kbd event9 leds \n"
+    "B: KEY=402000000 3803078f800d001 feffffdfffefffff fffffffffffffffe\n"
+    "\n";
+
+} // namespace
+
+class Ut_MImHwKeyboardTracker : public QObject
+{
+    Q_OBJECT
+
+public:
+    //! Replaces the device list the next scan will read.
+    void setDevices(const QByteArray &contents);
+
+private Q_SLOTS:
+    void init();
+    void cleanup();
+
+    void testNoKeyboard();
+    void testKeyboard();
+    void testVirtualKeyboardDoesNotCount();
+
+    void testKeyboardArriving();
+    void testKeyboardLeaving();
+    void testRescanWithNoChangeIsQuiet();
+
+    void testKeypadIsNotCountedByDefault();
+    void testKeypadCountedWhenAccepted();
+    void testAcceptingKeypadsReportsTheChange();
+
+    void testForcedOn();
+    void testForcedOff();
+
+    void testZinwaQ25();
+
+private:
+    QTemporaryFile *m_devices = nullptr;
+};
+
+void Ut_MImHwKeyboardTracker::setDevices(const QByteArray &contents)
+{
+    m_devices->resize(0);
+    QCOMPARE(m_devices->write(contents), qint64(contents.size()));
+    m_devices->flush();
+}
+
+void Ut_MImHwKeyboardTracker::init()
+{
+    m_devices = new QTemporaryFile;
+    QVERIFY(m_devices->open());
+    qputenv("MALIIT_HW_INPUT_DEVICES", m_devices->fileName().toLocal8Bit());
+}
+
+void Ut_MImHwKeyboardTracker::cleanup()
+{
+    qunsetenv("MALIIT_HW_INPUT_DEVICES");
+    delete m_devices;
+    m_devices = nullptr;
+}
+
+void Ut_MImHwKeyboardTracker::testNoKeyboard()
+{
+    setDevices(PowerButtonBlock);
+
+    const MImHwKeyboardTracker tracker;
+
+    QVERIFY(!tracker.isPresent());
+    QVERIFY(!tracker.isOpen());
+    QCOMPARE(tracker.attachedKinds(),
+             MImKeyboard::KeyboardKinds(MImKeyboard::NotAKeyboard));
+}
+
+void Ut_MImHwKeyboardTracker::testKeyboard()
+{
+    setDevices(QByteArray(PowerButtonBlock) + KeyboardBlock);
+
+    const MImHwKeyboardTracker tracker;
+
+    QVERIFY(tracker.isPresent());
+    QVERIFY(tracker.isOpen());
+    QVERIFY(tracker.attachedKinds().testFlag(MImKeyboard::TextKeyboard));
+}
+
+void Ut_MImHwKeyboardTracker::testVirtualKeyboardDoesNotCount()
+{
+    setDevices(QByteArray(PowerButtonBlock) + VirtualKeyboardBlock);
+
+    const MImHwKeyboardTracker tracker;
+
+    QVERIFY(!tracker.isPresent());
+    QVERIFY(!tracker.isOpen());
+}
+
+void Ut_MImHwKeyboardTracker::testKeyboardArriving()
+{
+    setDevices(PowerButtonBlock);
+
+    MImHwKeyboardTracker tracker;
+    QSignalSpy changed(&tracker, &MImHwKeyboardTracker::stateChanged);
+    QVERIFY(changed.isValid());
+
+    setDevices(QByteArray(PowerButtonBlock) + KeyboardBlock);
+    tracker.refresh();
+
+    QCOMPARE(changed.count(), 1);
+    QVERIFY(tracker.isOpen());
+}
+
+void Ut_MImHwKeyboardTracker::testKeyboardLeaving()
+{
+    // The case that matters most: a detachable keyboard pulled off while a text
+    // field has focus. Nothing else will tell the shell to put the on-screen
+    // keyboard back.
+    setDevices(QByteArray(PowerButtonBlock) + KeyboardBlock);
+
+    MImHwKeyboardTracker tracker;
+    QVERIFY(tracker.isOpen());
+
+    QSignalSpy changed(&tracker, &MImHwKeyboardTracker::stateChanged);
+
+    setDevices(PowerButtonBlock);
+    tracker.refresh();
+
+    QCOMPARE(changed.count(), 1);
+    QVERIFY(!tracker.isOpen());
+    QVERIFY(!tracker.isPresent());
+}
+
+void Ut_MImHwKeyboardTracker::testRescanWithNoChangeIsQuiet()
+{
+    // Every input device coming or going wakes a rescan, and most of them have
+    // nothing to do with keyboards. A signal per event would restart the input
+    // source handling for no reason.
+    setDevices(QByteArray(PowerButtonBlock) + KeyboardBlock);
+
+    MImHwKeyboardTracker tracker;
+    QSignalSpy changed(&tracker, &MImHwKeyboardTracker::stateChanged);
+
+    tracker.refresh();
+    setDevices(QByteArray(PowerButtonBlock) + KeyboardBlock + KeypadBlock);
+    tracker.refresh();
+
+    QCOMPARE(changed.count(), 0);
+    QVERIFY(tracker.isOpen());
+}
+
+void Ut_MImHwKeyboardTracker::testKeypadIsNotCountedByDefault()
+{
+    setDevices(KeypadBlock);
+
+    const MImHwKeyboardTracker tracker;
+
+    QVERIFY(tracker.attachedKinds().testFlag(MImKeyboard::TelephoneKeypad));
+    QVERIFY(tracker.isPresent());
+    QVERIFY(!tracker.isOpen());
+}
+
+void Ut_MImHwKeyboardTracker::testKeypadCountedWhenAccepted()
+{
+    setDevices(KeypadBlock);
+
+    MImHwKeyboardTracker tracker;
+    tracker.setAcceptedKinds(MImKeyboard::TextKeyboard
+                             | MImKeyboard::TelephoneKeypad);
+
+    QVERIFY(tracker.isOpen());
+}
+
+void Ut_MImHwKeyboardTracker::testAcceptingKeypadsReportsTheChange()
+{
+    setDevices(KeypadBlock);
+
+    MImHwKeyboardTracker tracker;
+    QSignalSpy changed(&tracker, &MImHwKeyboardTracker::stateChanged);
+
+    tracker.setAcceptedKinds(MImKeyboard::TextKeyboard
+                             | MImKeyboard::TelephoneKeypad);
+    QCOMPARE(changed.count(), 1);
+
+    // Setting the same policy again changes nothing and says nothing.
+    tracker.setAcceptedKinds(MImKeyboard::TextKeyboard
+                             | MImKeyboard::TelephoneKeypad);
+    QCOMPARE(changed.count(), 1);
+}
+
+void Ut_MImHwKeyboardTracker::testForcedOn()
+{
+    setDevices(PowerButtonBlock);
+
+    MImHwKeyboardTracker tracker;
+    QVERIFY(!tracker.isOpen());
+
+    QSignalSpy changed(&tracker, &MImHwKeyboardTracker::stateChanged);
+    tracker.setForcedState(1);
+
+    QCOMPARE(changed.count(), 1);
+    QVERIFY(tracker.isOpen());
+
+    // Still no keyboard attached: the override says what to do, not what is
+    // plugged in.
+    QVERIFY(!tracker.isPresent());
+}
+
+void Ut_MImHwKeyboardTracker::testForcedOff()
+{
+    setDevices(QByteArray(PowerButtonBlock) + KeyboardBlock);
+
+    MImHwKeyboardTracker tracker;
+    QVERIFY(tracker.isOpen());
+
+    tracker.setForcedState(0);
+
+    QVERIFY(!tracker.isOpen());
+
+    // The keyboard is still attached and still said to be. Anything that offers
+    // a way to undo this override needs to know it is still relevant - hiding
+    // the control the moment it is used would strand the user.
+    QVERIFY(tracker.isPresent());
+
+    // Back to deciding from the hardware.
+    tracker.setForcedState(-1);
+    QVERIFY(tracker.isOpen());
+    QVERIFY(tracker.isPresent());
+}
+
+void Ut_MImHwKeyboardTracker::testZinwaQ25()
+{
+    setDevices(Q25Devices);
+
+    const MImHwKeyboardTracker tracker;
+
+    QVERIFY(tracker.isPresent());
+    QVERIFY(tracker.isOpen());
+    QVERIFY(tracker.attachedKinds().testFlag(MImKeyboard::TextKeyboard));
+
+    // Its keypad is a handful of keys, not a telephone keypad, so nothing here
+    // depends on the keypad policy either way.
+    QVERIFY(!tracker.attachedKinds().testFlag(MImKeyboard::TelephoneKeypad));
+
+    // And the headset jack's EV_SW codes must not have been taken for a
+    // keyboard-presence switch: if they had, isOpen() would be answering from a
+    // jack rather than from the keyboard, and plugging headphones in would take
+    // the keyboard away.
+    MImHwKeyboardTracker plain;
+    plain.setForcedState(0);
+    QVERIFY(!plain.isOpen());
+    plain.setForcedState(-1);
+    QVERIFY(plain.isOpen());
+}
+
+QTEST_GUILESS_MAIN(Ut_MImHwKeyboardTracker)
+#include "ut_mimhwkeyboardtracker.moc"

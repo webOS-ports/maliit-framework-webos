@@ -24,6 +24,7 @@
 #include <maliit/plugins/abstractinputmethod.h>
 #include "mimsettings.h"
 #include "mimhwkeyboardtracker.h"
+#include "mimkeyboardkind.h"
 #include <maliit/plugins/updateevent.h>
 #include "mimsubviewoverride.h"
 #include "maliit/namespaceinternal.h"
@@ -60,6 +61,17 @@ namespace
     const QString PluginRoot           = MALIIT_CONFIG_ROOT"plugins";
     const QString PluginSettings       = MALIIT_CONFIG_ROOT"pluginsettings";
     const QString MImAccesoryEnabled   = MALIIT_CONFIG_ROOT"accessoryenabled";
+
+    //! "on" to report a hardware keyboard whatever the hardware says, "off"
+    //! never to, anything else (the default) to decide from the hardware.
+    const QString MImHwKeyboardForced  = MALIIT_CONFIG_ROOT"hwkeyboard/forced";
+    //! Whether a telephone keypad counts as a hardware keyboard. Off by
+    //! default; see MImHwKeyboardTracker::setAcceptedKinds().
+    const QString MImHwKeyboardKeypad  = MALIIT_CONFIG_ROOT"hwkeyboard/keypadcounts";
+    //! The physical keyboard's layout, declared per device: QWERTY, QWERTZ,
+    //! AZERTY and the two localised variants legacy named. Empty by default,
+    //! because it cannot be worked out - see hardwareKeyboardLayout().
+    const QString MImHwKeyboardLayout  = MALIIT_CONFIG_ROOT"hwkeyboard/layout";
 
     const char * const InputMethodItem = "inputMethod";
     const char * const LoadAll = "loadAll";
@@ -99,6 +111,9 @@ MIMPluginManagerPrivate::~MIMPluginManagerPrivate()
     // Parentless, so nothing else is going to collect these.
     delete localeInfo;
     delete imAccessoryEnabledConf;
+    delete hwkbForcedConf;
+    delete hwkbKeypadConf;
+    delete hwkbLayoutConf;
     delete shutDownInterval;
     delete isStaticService;
 }
@@ -431,19 +446,26 @@ void MIMPluginManagerPrivate::setActiveHandlers(const QSet<Maliit::HandlerState>
             if (plugin && inputMethod) {
                 plugins[plugin].state << state;
                 activatedPlugins.insert(plugin);
-
-                if (visible) {
-                    ensureActivePluginsVisible(DontShowInputMethod);
-                    inputMethod->show();
-                    inputMethod->showLanguageNotification();
-                }
             }
         }
     }
 
-    // notify plugins about new states
+    // Notify plugins about new states. Before showing anything, not after: a
+    // plugin decides from its state whether it puts a window up at all - one
+    // serving Maliit::Hardware keeps its on-screen keyboard down - and telling
+    // it afterwards let the panel flash up on every switch to a hardware
+    // keyboard.
     Q_FOREACH (Maliit::Plugins::InputMethodPlugin *plugin, activatedPlugins) {
         plugins.value(plugin).inputMethod->setState(plugins.value(plugin).state);
+    }
+
+    if (visible) {
+        ensureActivePluginsVisible(DontShowInputMethod);
+
+        Q_FOREACH (Maliit::Plugins::InputMethodPlugin *plugin, activatedPlugins) {
+            plugins.value(plugin).inputMethod->show();
+            plugins.value(plugin).inputMethod->showLanguageNotification();
+        }
     }
 
     // deactivate unnecessary plugins
@@ -1303,8 +1325,13 @@ MIMPluginManager::MIMPluginManager(const QSharedPointer<MInputContextConnection>
 
     connect(&d->onScreenPlugins, SIGNAL(activeSubViewChanged()), this, SLOT(_q_onScreenSubViewChanged()));
     connect(&d->onScreenPlugins, SIGNAL(enabledPluginsChanged()), this, SIGNAL(pluginsChanged()));
-    if (d->hwkbTracker.isPresent())
-        connect(&d->hwkbTracker, SIGNAL(stateChanged()), this, SLOT(updateInputSource()), Qt::UniqueConnection);
+
+    // Unconditionally, unlike before: presence is no longer fixed at startup by
+    // whether a SW_TABLET_MODE switch exists. A detachable keyboard - the
+    // PineTab2's, a USB or a Bluetooth one - arrives and leaves while the
+    // session runs, and when it leaves mid-sentence the on-screen keyboard has
+    // to come back for the field that is focused right now.
+    connect(&d->hwkbTracker, SIGNAL(stateChanged()), this, SLOT(updateInputSource()), Qt::UniqueConnection);
 
     d->imAccessoryEnabledConf = new MImSettings(MImAccesoryEnabled);
     d->imAccessoryEnabledConf->set(false); // start Maliit with accessory disabled
@@ -1322,6 +1349,21 @@ MIMPluginManager::MIMPluginManager(const QSharedPointer<MInputContextConnection>
 
     connect(d->imAccessoryEnabledConf, SIGNAL(valueChanged()), this, SLOT(updateInputSource()));
     connect(d->localeInfo, SIGNAL(valueChanged()), this, SLOT(updatePlugins()));
+
+    // Deliberately down here, after every setting updateInputSource() reads has
+    // been constructed. It dereferences imAccessoryEnabledConf, and these
+    // members are raw pointers that nothing initialises, so applying the policy
+    // any earlier read a wild pointer and took the server down on startup.
+    d->hwkbForcedConf = new MImSettings(MImHwKeyboardForced);
+    d->hwkbKeypadConf = new MImSettings(MImHwKeyboardKeypad);
+    d->hwkbLayoutConf = new MImSettings(MImHwKeyboardLayout);
+    connect(d->hwkbForcedConf, SIGNAL(valueChanged()), this, SLOT(updateHwKeyboardPolicy()));
+    connect(d->hwkbKeypadConf, SIGNAL(valueChanged()), this, SLOT(updateHwKeyboardPolicy()));
+    // Not updateHwKeyboardPolicy(): the layout changes nothing about which
+    // handler is chosen, it is only reported onwards.
+    connect(d->hwkbLayoutConf, SIGNAL(valueChanged()),
+            this, SIGNAL(hardwareKeyboardStatusChanged()));
+    updateHwKeyboardPolicy();
 
     updatePlugins();
 }
@@ -1448,6 +1490,245 @@ void MIMPluginManager::updatePlugins()
     }
 }
 
+bool MIMPluginManager::hardwareKeyboardPresent() const
+{
+    Q_D(const MIMPluginManager);
+
+    return d->hwkbTracker.isPresent();
+}
+
+bool MIMPluginManager::hardwareKeyboardUsable() const
+{
+    Q_D(const MIMPluginManager);
+
+    return d->hwkbTracker.isOpen();
+}
+
+QString MIMPluginManager::declaredKeyboardLayout()
+{
+    // Read on each query rather than cached: the file is a bind mount put in
+    // place during boot by luneos-device-config, and the server can outlive a
+    // re-run of that. It is a few bytes.
+    QByteArray path(qgetenv("MALIIT_HWKEYBOARD_LAYOUT_FILE"));
+
+    if (path.isEmpty())
+        path = QByteArray(MALIIT_HWKEYBOARD_LAYOUT_FILE);
+
+    QFile file(QString::fromLocal8Bit(path));
+
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+        return QString();
+
+    // First line that is neither blank nor a comment. The shipped file is all
+    // comment, which is how a device that declares nothing says so.
+    while (!file.atEnd()) {
+        const QString line(QString::fromUtf8(file.readLine()).trimmed());
+
+        if (line.isEmpty() || line.startsWith(QLatin1Char('#')))
+            continue;
+
+        return line;
+    }
+
+    return QString();
+}
+
+bool MIMPluginManager::hardwareKeyboardIsSlider() const
+{
+    Q_D(const MIMPluginManager);
+
+    return d->hwkbTracker.hasSwitch();
+}
+
+QString MIMPluginManager::hardwareKeyboardLayout() const
+{
+    Q_D(const MIMPluginManager);
+
+    // Three sources, most specific first.
+    //
+    // The setting, so a preference - or a test - can override the hardware.
+    if (d->hwkbLayoutConf) {
+        const QString configured(d->hwkbLayoutConf->value().toString().trimmed());
+
+        if (!configured.isEmpty())
+            return configured;
+    }
+
+    // Then the plugin, which named the keyboard by matching the input device it
+    // is attached to. More specific than the device's declaration: a BlackBerry
+    // KEY2 is sold with three different keyboards and one adaptation covers all
+    // of them.
+    if (!d->pluginKeyboardLayout.isEmpty())
+        return d->pluginKeyboardLayout;
+
+    // Then what the device declares for the keyboard it usually has, which is the
+    // only answer for a keyboard no plugin has a profile for.
+    return declaredKeyboardLayout();
+}
+
+QVariantMap MIMPluginManager::hardwareKeyFaceDigits() const
+{
+    Q_D(const MIMPluginManager);
+
+    return d->pluginKeyFaceDigits;
+}
+
+QString MIMPluginManager::keyboardLayoutOverride() const
+{
+    Q_D(const MIMPluginManager);
+
+    if (!d->hwkbLayoutConf)
+        return QString();
+
+    return d->hwkbLayoutConf->value().toString().trimmed();
+}
+
+void MIMPluginManager::setKeyboardLayoutOverride(const QString &layout)
+{
+    Q_D(MIMPluginManager);
+
+    if (!d->hwkbLayoutConf) {
+        qWarning() << "asked to set the keyboard layout before the settings exist";
+        return;
+    }
+
+    const QString trimmed(layout.trimmed());
+
+    if (keyboardLayoutOverride() == trimmed)
+        return;
+
+    d->hwkbLayoutConf->set(trimmed);
+
+    qInfo() << "the hardware keyboard layout is now"
+            << (trimmed.isEmpty() ? QStringLiteral("(decided by the hardware)") : trimmed);
+
+    // The setting's own change notification is connected, but a write from
+    // inside this process is not guaranteed to come back as one - the same
+    // reason setOnScreenKeyboardForced() applies its own change.
+    Q_EMIT hardwareKeyboardStatusChanged();
+}
+
+bool MIMPluginManager::telephoneKeypadCounts() const
+{
+    Q_D(const MIMPluginManager);
+
+    return d->hwkbKeypadConf && d->hwkbKeypadConf->value(false).toBool();
+}
+
+void MIMPluginManager::setTelephoneKeypadCounts(bool counts)
+{
+    Q_D(MIMPluginManager);
+
+    if (!d->hwkbKeypadConf) {
+        qWarning() << "asked about telephone keypads before the settings exist";
+        return;
+    }
+
+    if (telephoneKeypadCounts() == counts)
+        return;
+
+    d->hwkbKeypadConf->set(counts);
+
+    qInfo() << "a telephone keypad" << (counts ? "now counts" : "no longer counts")
+            << "as a hardware keyboard";
+
+    // Unlike the layout, this one moves the answer: it decides which kinds the
+    // tracker accepts, and so whether the on-screen keyboard is taken away.
+    updateHwKeyboardPolicy();
+}
+
+void MIMPluginManager::setHardwareKeyFaceDigits(const QVariantMap &digits)
+{
+    Q_D(MIMPluginManager);
+
+    if (d->pluginKeyFaceDigits == digits)
+        return;
+
+    d->pluginKeyFaceDigits = digits;
+
+    qInfo() << "the active plugin reports" << digits.size()
+            << "digits printed on the keyboard's key faces";
+
+    Q_EMIT hardwareKeyboardStatusChanged();
+}
+
+void MIMPluginManager::setHardwareKeyboardLayout(const QString &layout)
+{
+    Q_D(MIMPluginManager);
+
+    const QString trimmed(layout.trimmed());
+
+    if (d->pluginKeyboardLayout == trimmed)
+        return;
+
+    d->pluginKeyboardLayout = trimmed;
+
+    qInfo() << "the active plugin reports the hardware keyboard layout as"
+            << (trimmed.isEmpty() ? QStringLiteral("(not stated)") : trimmed);
+
+    Q_EMIT hardwareKeyboardStatusChanged();
+}
+
+bool MIMPluginManager::onScreenKeyboardForced() const
+{
+    Q_D(const MIMPluginManager);
+
+    if (!d->hwkbForcedConf)
+        return false;
+
+    return d->hwkbForcedConf->value().toString().trimmed().toLower()
+        == QLatin1String("off");
+}
+
+void MIMPluginManager::setOnScreenKeyboardForced(bool forced)
+{
+    Q_D(MIMPluginManager);
+
+    if (!d->hwkbForcedConf) {
+        qWarning() << "asked for the on-screen keyboard before the settings exist";
+        return;
+    }
+
+    if (onScreenKeyboardForced() == forced)
+        return;
+
+    // "off" is the tracker being told to report no hardware keyboard at all,
+    // which is what puts the handlers back on Maliit::OnScreen and the keys back
+    // on screen. Leaving it empty is "decide from the hardware".
+    d->hwkbForcedConf->set(forced ? QVariant(QStringLiteral("off")) : QVariant(QString()));
+
+    // Applied here rather than left to the setting's own change notification: a
+    // write from inside this process is not guaranteed to come back as one, and
+    // a toggle that sometimes does nothing is worse than one that is applied
+    // twice. updateHwKeyboardPolicy() is idempotent.
+    updateHwKeyboardPolicy();
+}
+
+void MIMPluginManager::updateHwKeyboardPolicy()
+{
+    Q_D(MIMPluginManager);
+
+    const QString forced(d->hwkbForcedConf->value().toString().trimmed().toLower());
+
+    if (forced == QLatin1String("on"))
+        d->hwkbTracker.setForcedState(1);
+    else if (forced == QLatin1String("off"))
+        d->hwkbTracker.setForcedState(0);
+    else
+        d->hwkbTracker.setForcedState(-1);
+
+    MImKeyboard::KeyboardKinds kinds(MImKeyboard::TextKeyboard);
+
+    if (d->hwkbKeypadConf->value(false).toBool())
+        kinds |= MImKeyboard::TelephoneKeypad;
+
+    d->hwkbTracker.setAcceptedKinds(kinds);
+
+    // The tracker only signals when its answer moves, and on the first call here
+    // it has not moved at all - so drive the handlers from what it says now.
+    updateInputSource();
+}
+
 void MIMPluginManager::updateInputSource()
 {
     Q_D(MIMPluginManager);
@@ -1455,7 +1736,25 @@ void MIMPluginManager::updateInputSource()
     // OnScreen is mutually exclusive to Hardware and Accessory.
     QSet<Maliit::HandlerState> handlers = d->activeHandlers();
 
-    if (d->hwkbTracker.isOpen()) {
+    // Only switch to Maliit::Hardware when a plugin is actually mapped to it.
+    // server.conf seeds plugins\hardware on first boot and is not rewritten
+    // afterwards, so a device that first booted a build without that line has no
+    // handler for it - and setActiveHandlers() would then deactivate the
+    // on-screen plugin as unnecessary without activating anything in its place,
+    // leaving no input method at all rather than one with its panel down.
+    const bool canHandleHardware = d->handlerToPlugin.contains(Maliit::Hardware);
+
+    // Quiet while the map is empty: loadHandlerMap() has not run yet at that
+    // point, and warning then would fire on every startup rather than only on a
+    // device that really has no hardware handler.
+    if (d->hwkbTracker.isOpen() && !canHandleHardware
+        && !d->handlerToPlugin.isEmpty()) {
+        qWarning() << "a hardware keyboard is present but no plugin is registered"
+                   << "for it; keeping the on-screen keyboard. Set"
+                   << (PluginRoot + "/hardware") << "to a plugin to change that.";
+    }
+
+    if (d->hwkbTracker.isOpen() && canHandleHardware) {
         // hw keyboard is on
         handlers.remove(Maliit::OnScreen);
         handlers.insert(Maliit::Hardware);
@@ -1475,6 +1774,8 @@ void MIMPluginManager::updateInputSource()
     if (!handlers.isEmpty()) {
         d->setActiveHandlers(handlers);
     }
+
+    Q_EMIT hardwareKeyboardStatusChanged();
 }
 
 void MIMPluginManager::switchPlugin(Maliit::SwitchDirection direction,

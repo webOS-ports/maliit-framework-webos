@@ -50,7 +50,7 @@ MImServer::MImServer(const QSharedPointer<MInputContextConnection> &icConnection
 
     d->icConnection = icConnection;
     d->pluginManager = new MIMPluginManager(d->icConnection, platform);
-    d->lunaService.reset(new IMELunaService(d->icConnection));
+    d->lunaService.reset(new IMELunaService(d->icConnection, d->pluginManager));
 
     webOSLogInfo("VKB_VERSION", "FRAMEWORK", MALIIT_VERSION);
 }

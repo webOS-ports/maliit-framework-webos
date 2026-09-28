@@ -2,10 +2,10 @@
 
 The suite covers the parts of MaliitServer that take input from somewhere it
 does not control — the LS2 bus, the wayland compositor, plugin settings, the
-evdev nodes — plus the bookkeeping around object lifetime that has produced
-the crashes worth remembering. It is deliberately not a coverage exercise: a
-test is here because the code it drives is either a boundary or a place
-something already went wrong.
+evdev nodes, what procfs says is plugged in — plus the bookkeeping around
+object lifetime that has produced the crashes worth remembering. It is
+deliberately not a coverage exercise: a test is here because the code it drives
+is either a boundary or a place something already went wrong.
 
 ## Building and running
 
@@ -101,6 +101,9 @@ is worth reading.
 | `ut_jsonparams` | `Maliit::Json::toInt()`: every number reaching MaliitServer from the LS2 bus. NaN, the infinities, values past `INT_MAX`, non-numbers, and that a rejected value leaves the caller's default alone. |
 | `ut_xkbmodifiers` | `Maliit::xkbModifierIsSet()`: modifier indices from a keymap, including `XKB_MOD_INVALID` and anything else that cannot be a shift count. |
 | `ut_evdevbits` | The evdev bitmap sizing rule, against a model of the kernel's `bits_to_user()`. Includes static assertions, so a wrong answer fails to compile on whichever architecture is being built. |
+| `ut_miminputdevices` | Parsing /proc/bus/input/devices: the word-width rule, against real `B: KEY=` lines from an MP01 and a Mindset whose padding differs, plus the uinput-versus-uhid distinction that decides whether a keyboard is the user's or a program's. |
+| `ut_mimkeyboardkind` | What counts as a keyboard. Every device that shares the input subsystem with one - power button, volume rocker, touchscreen, mouse, numeric keypad - has to be rejected, because a false positive leaves a phone with no way to type. |
+| `ut_mimhwkeyboardtracker` | The transitions the rest of the stack reacts to: a keyboard arriving, a keyboard pulled off mid-sentence, a rescan that changes nothing staying quiet, and the two setting overrides. Driven through `MALIIT_HW_INPUT_DEVICES`. Includes a Zinwa Q25's real device list, verbatim off the device. |
 | `ut_settingdata` | `validateSettingValue()`: type, domain and range checking of plugin-settings writes, and that a malformed constraint rejects rather than degrading to "unconstrained". |
 | `ut_mattributeextensionid` | Validity and identity of the key that keeps one client out of another client's attribute extension, including its behaviour as a `QHash` key. |
 | `ut_keyoverridedata` | The `createKeyOverride()`/`keyOverride()` pair, and that a fetch for an id that was never created returns null. |

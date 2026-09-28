@@ -61,6 +61,7 @@ public:
     virtual int enterKeyType(bool &valid);
     virtual bool correctionEnabled(bool &valid);
     virtual bool predictionEnabled(bool &valid);
+    virtual bool onScreenKeyboardAllowed(bool &valid);
     virtual bool autoCapitalizationEnabled(bool &valid);
     virtual bool surroundingText(QString &text, int &cursorPosition);
     virtual bool hasSelection(bool &valid);
@@ -109,6 +110,9 @@ public:
     virtual int instanceId() const;
     virtual QString appId() const;
     virtual QString serviceName() const;
+    virtual void setOnScreenKeyboardForced(bool forced);
+    virtual void setHardwareKeyboardLayout(const QString &layout);
+    virtual void setHardwareKeyFaceDigits(const QVariantMap &digits);
     // \reimp_end
 
 private:

@@ -186,10 +186,24 @@ public:
     HandlerMap handlerToPlugin;
 
     QList<MImSettings *> handlerToPluginConfs;
-    MImSettings *localeInfo;
-    MImSettings *imAccessoryEnabledConf;
-    MImSettings *shutDownInterval;
-    MImSettings *isStaticService;
+    // All of these are deleted in the destructor and assigned partway through
+    // MIMPluginManager's constructor, so an early return - or, as happened, code
+    // reading one before its turn - hit an indeterminate pointer.
+    MImSettings *localeInfo = nullptr;
+    MImSettings *imAccessoryEnabledConf = nullptr;
+    //! Overrides for hardware keyboard detection, so a device this gets
+    //! wrong can be corrected without a rebuild.
+    MImSettings *hwkbForcedConf = nullptr;
+    MImSettings *hwkbKeypadConf = nullptr;
+    MImSettings *hwkbLayoutConf = nullptr;
+    //! What the active plugin says the attached keyboard's layout is; see
+    //! MIMPluginManager::setHardwareKeyboardLayout().
+    QString pluginKeyboardLayout;
+    //! What the active plugin says is printed on the key faces; see
+    //! MIMPluginManager::setHardwareKeyFaceDigits().
+    QVariantMap pluginKeyFaceDigits;
+    MImSettings *shutDownInterval = nullptr;
+    MImSettings *isStaticService = nullptr;
 
     QTimer shutDownTimer;
     QString activeSubViewIdOnScreen;

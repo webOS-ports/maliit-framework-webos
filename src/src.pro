@@ -52,6 +52,8 @@ SERVER_HEADERS_PRIVATE += \
         mattributeextensionmanager.h \
         msharedattributeextensionmanager.h \
         mimevdevbits.h \
+        miminputdevices.h \
+        mimkeyboardkind.h \
         mimhwkeyboardtracker.h \
         mimonscreenplugins.h \
         mimhwkeyboardtracker_p.h \
@@ -70,6 +72,8 @@ SERVER_SOURCES += \
         mattributeextensionmanager.cpp \
         msharedattributeextensionmanager.cpp \
         mimhwkeyboardtracker.cpp \
+        miminputdevices.cpp \
+        mimkeyboardkind.cpp \
         mimonscreenplugins.cpp \
         mimsubviewoverride.cpp \
         mimserveroptions.cpp \
@@ -104,6 +108,15 @@ enable-pmloglib {
 }
 
 DEFINES += "MALIIT_VERSION=\\\"$${MALIIT_VERSION}\\\""
+
+# Where the device declares its physical keyboard's layout; see
+# MIMPluginManager::declaredKeyboardLayout(). A file rather than a setting
+# because it is a fact about the hardware, and on LuneOS one rootfs boots every
+# device, so it is bind-mounted into place during boot.
+isEmpty(MALIIT_HWKEYBOARD_LAYOUT_FILE) {
+    MALIIT_HWKEYBOARD_LAYOUT_FILE = /etc/maliit/hwkeyboard-layout
+}
+DEFINES += "MALIIT_HWKEYBOARD_LAYOUT_FILE=\\\"$${MALIIT_HWKEYBOARD_LAYOUT_FILE}\\\""
 
 PKGCONFIG += glib-2.0 luna-service2
 

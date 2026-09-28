@@ -18,6 +18,7 @@
 #define MABSTRACTINPUTMETHODHOST_H
 
 #include <QRect>
+#include <QVariantMap>
 #include <QObject>
 #include <QPixmap>
 #include <QVariant>
@@ -83,6 +84,22 @@ public:
      * \brief returns input method auto-capitalization hint if output parameter valid is true.
      */
     virtual bool autoCapitalizationEnabled(bool &valid) = 0;
+
+    /*!
+     * \brief returns whether the focused field will accept an on-screen
+     * keyboard, if output parameter valid is true.
+     *
+     * A field that has a keypad of its own -- a dialer, a PIN pad -- needs the
+     * input method to know about it, for the content type and so that a
+     * physical keyboard's keys are redirected here, while wanting nothing
+     * drawn on screen. Those two used to be the same thing: the platform input
+     * context activates the text model when a field takes focus, and
+     * activation is what puts the keys up.
+     *
+     * Not pure, and true by default: an input method host that predates this,
+     * or a field that says nothing, behaves exactly as it always has.
+     */
+    virtual bool onScreenKeyboardAllowed(bool &valid) { valid = false; return true; }
 
     /*!
      * \brief get surrounding text and cursor position information
@@ -346,6 +363,49 @@ public:
      * \brief Get serviceName of current instance.
      */
     virtual QString serviceName() const = 0;
+
+    /*!
+     * \brief Asks for the on-screen keyboard to be forced on, or lets the
+     * hardware decide again.
+     *
+     * The same switch the shell's system menu drives, offered to the plugin so
+     * that the two cannot disagree. A plugin that lets the user put the keys
+     * away while a physical keyboard is attached has to release the force here
+     * rather than remember the dismissal privately: the menu reads this state,
+     * so a private flag would leave the toggle still saying "on" and the user
+     * would have to switch it off and back on to get the keys returned.
+     *
+     * Not pure, and a no-op by default: a host that has no notion of a hardware
+     * keyboard has nothing to force.
+     */
+    virtual void setOnScreenKeyboardForced(bool forced) { Q_UNUSED(forced); }
+
+    /*!
+     * \brief Tells the framework the layout printed on the attached keyboard.
+     *
+     * QWERTY, QWERTZ, AZERTY and the two localised variants legacy named, or
+     * empty for "not stated". Offered to the plugin because the plugin is what
+     * identifies the keyboard: it matches the input device's name against its own
+     * profiles, and on a phone sold with several keyboards - the BlackBerry KEY2 -
+     * the name is the only thing that tells them apart. The device's own
+     * declaration covers the keyboards no profile matches.
+     *
+     * Not pure, and a no-op by default: a host with no notion of a hardware
+     * keyboard has no layout to be told about.
+     */
+    virtual void setHardwareKeyboardLayout(const QString &layout) { Q_UNUSED(layout); }
+
+    /*!
+     * \brief Tells the framework the digits printed on the keyboard's key faces.
+     *
+     * Reported onward for the things that take digits without an input method at
+     * all - the lock screen's PIN pad is the shell's own QML, running inside the
+     * compositor, so no plugin ever sees its keys. Offered by the plugin because
+     * the plugin is what identified the keyboard and holds its key map.
+     *
+     * Keyed by evdev scancode as a string, since it crosses a JSON boundary.
+     */
+    virtual void setHardwareKeyFaceDigits(const QVariantMap &digits) { Q_UNUSED(digits); }
 
 private:
     Q_DISABLE_COPY(MAbstractInputMethodHost)

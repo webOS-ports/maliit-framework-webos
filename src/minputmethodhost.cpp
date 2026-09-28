@@ -74,6 +74,11 @@ bool MInputMethodHost::predictionEnabled(bool &valid)
     return connection->predictionEnabled(valid);
 }
 
+bool MInputMethodHost::onScreenKeyboardAllowed(bool &valid)
+{
+    return connection->onScreenKeyboardAllowed(valid);
+}
+
 bool MInputMethodHost::autoCapitalizationEnabled(bool &valid)
 {
     return connection->autoCapitalizationEnabled(valid);
@@ -263,6 +268,23 @@ AbstractPluginSetting *MInputMethodHost::registerPluginSetting(const QString &ke
                                                                const QVariantMap &attributes)
 {
     return pluginManager->registerPluginSetting(pluginId, pluginDescription, key, description, type, attributes);
+}
+
+void MInputMethodHost::setOnScreenKeyboardForced(bool forced)
+{
+    // Not gated on enabled: the plugin whose keys the user just dragged away is
+    // by definition the active one, and this is the moment its request matters.
+    pluginManager->setOnScreenKeyboardForced(forced);
+}
+
+void MInputMethodHost::setHardwareKeyboardLayout(const QString &layout)
+{
+    pluginManager->setHardwareKeyboardLayout(layout);
+}
+
+void MInputMethodHost::setHardwareKeyFaceDigits(const QVariantMap &digits)
+{
+    pluginManager->setHardwareKeyFaceDigits(digits);
 }
 
 int MInputMethodHost::instanceId() const

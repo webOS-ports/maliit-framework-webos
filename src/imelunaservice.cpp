@@ -21,12 +21,14 @@
 
 #include <QKeyEvent>
 #include "imelunaservice.h"
+#include "mimpluginmanager.h"
 #include "mimjsonparams.h"
 #include "minputcontextconnection.h"
 #include "luna-service2/lunaservice.h"
 #include "mimglobalsettings.h"
 
 const char *IMELunaService::SubscriberKey = "REMOTE_KEYBOARD_LIST";
+const char *IMELunaService::KeyboardStatusSubscriberKey = "KEYBOARD_STATUS_LIST";
 
 #include <QJsonObject>
 #include <utility>
@@ -119,8 +121,10 @@ protected:
 
 } // namespace
 
-IMELunaService::IMELunaService(QSharedPointer<MInputContextConnection> connection)
+IMELunaService::IMELunaService(QSharedPointer<MInputContextConnection> connection,
+                               MIMPluginManager *pluginManager)
     : m_connection(std::move(connection))
+    , m_pluginManager(pluginManager)
     , m_mainLoop(nullptr)
     , m_handle(nullptr)
     , m_focusChangedSinceLastBroadcast(false)
@@ -131,6 +135,11 @@ IMELunaService::IMELunaService(QSharedPointer<MInputContextConnection> connectio
     connect(m_connection.data(), &MInputContextConnection::widgetStateChanged, this, &IMELunaService::onWidgetStateChanged);
     connect(m_connection.data(), &MInputContextConnection::resetInputMethodRequest, this, &IMELunaService::onReset);
     connect(m_broadcastTimer, &QTimer::timeout, this, &IMELunaService::broadcastWidgetState);
+    if (m_pluginManager) {
+        connect(m_pluginManager, &MIMPluginManager::hardwareKeyboardStatusChanged,
+                this, &IMELunaService::onHardwareKeyboardStatusChanged);
+    }
+
 }
 
 IMELunaService::~IMELunaService()
@@ -615,12 +624,217 @@ bool IMELunaService::handleSubscriptionCancel(LSHandle *handle, LSMessage *messa
 
 } // extern "C"
 
+//! \brief What the shell needs to draw a "show the keyboard anyway" control, and
+//!        what anything else needs to know a physical keyboard is in use.
+QJsonObject IMELunaService::getKeyboardStatusJson() const
+{
+    QJsonObject status;
+
+    if (!m_pluginManager)
+        return status;
+
+    QJsonObject hardware;
+    hardware.insert("present", m_pluginManager->hardwareKeyboardPresent());
+    hardware.insert("usable", m_pluginManager->hardwareKeyboardUsable());
+    // True where the keyboard folds or slides away, so a caller knows "usable"
+    // can change without anything being plugged in or out.
+    hardware.insert("slider", m_pluginManager->hardwareKeyboardIsSlider());
+    // The declared layout, or empty where none is - see
+    // MIMPluginManager::hardwareKeyboardLayout(). Always present as a key so a
+    // caller does not have to tell "not declared" from "old server".
+    hardware.insert("layout", m_pluginManager->hardwareKeyboardLayout());
+    // What the key faces say, for callers that take digits without going through
+    // an input method at all - the lock screen's PIN pad is the shell's own QML,
+    // running inside the compositor, so no plugin ever sees its keys. Keyed by
+    // evdev scancode as a string.
+    // What has been set, as opposed to what is in force: "layout" above is the
+    // answer after the plugin and the device's declaration have had their say,
+    // and a settings page needs to show which of those is being overridden.
+    hardware.insert("layoutOverride", m_pluginManager->keyboardLayoutOverride());
+    hardware.insert("keypadCounts", m_pluginManager->telephoneKeypadCounts());
+    hardware.insert("keyFaceDigits",
+                    QJsonObject::fromVariantMap(m_pluginManager->hardwareKeyFaceDigits()));
+
+    status.insert("hardwareKeyboard", hardware);
+    status.insert("onScreenKeyboardForced", m_pluginManager->onScreenKeyboardForced());
+
+    return status;
+}
+
+void IMELunaService::onHardwareKeyboardStatusChanged()
+{
+    const QJsonObject status(getKeyboardStatusJson());
+
+    // updateInputSource() runs for reasons unrelated to this - an accessory
+    // setting, a plugin reload - so only say something when the answer moved.
+    if (status == m_lastKeyboardStatus)
+        return;
+
+    m_lastKeyboardStatus = status;
+
+    QJsonObject response(status);
+    response.insert("returnValue", true);
+
+    LSErrorWrapper err;
+    QJsonDocument document(response);
+
+    if (!LSSubscriptionReply(m_handle, IMELunaService::KeyboardStatusSubscriberKey,
+                             document.toJson().constData(), err)) {
+        qWarning() << "failed to broadcast the keyboard status";
+    }
+}
+
+bool IMELunaService::handleGetKeyboardStatus(LSHandle *handle, LSMessage *message, void *data)
+{
+    Q_UNUSED(handle);
+
+    IMELunaService *service = static_cast<IMELunaService *>(data);
+
+    LSMessageAdapter msg(message);
+
+    if (!service->m_pluginManager) {
+        msg.replyError("No plugin manager; keyboard status is unavailable");
+        return true;
+    }
+
+    QJsonObject response(service->getKeyboardStatusJson());
+    response.insert("returnValue", true);
+
+    if (msg.isSubscription()) {
+        if (!msg.addSubscription(IMELunaService::KeyboardStatusSubscriberKey)) {
+            msg.replyError("Failed to add subscription");
+            return true;
+        }
+
+        response.insert("subscribed", true);
+
+        // So the first broadcast after this is a real change and not a repeat of
+        // what the subscriber was just handed.
+        service->m_lastKeyboardStatus = service->getKeyboardStatusJson();
+    }
+
+    msg.respond(response);
+
+    return true;
+}
+
+//! \brief Asks for the on-screen keyboard even though a physical one is attached.
+//!
+//! The way back to an emoji, a script the hardware has no keys for, or a key it
+//! is missing. Sticky until turned off again, which is how LunaSysMgr's keyboard
+//! key behaved: it toggled IMEController and left it there.
+bool IMELunaService::handleSetOnScreenKeyboardForced(LSHandle *handle, LSMessage *message, void *data)
+{
+    Q_UNUSED(handle);
+
+    IMELunaService *service = static_cast<IMELunaService *>(data);
+
+    LSMessageAdapter msg(message);
+
+    if (!service->m_pluginManager) {
+        msg.replyError("No plugin manager; the on-screen keyboard cannot be forced");
+        return true;
+    }
+
+    const QJsonObject payload(msg.getPayload());
+    const QJsonValue forced(payload.value(QStringLiteral("forced")));
+
+    if (!forced.isBool()) {
+        msg.replyError("\"forced\" is required and must be a boolean");
+        return true;
+    }
+
+    service->m_pluginManager->setOnScreenKeyboardForced(forced.toBool());
+
+    QJsonObject response(service->getKeyboardStatusJson());
+    response.insert("returnValue", true);
+    msg.respond(response);
+
+    return true;
+}
+
+//! \brief Says what layout the attached keyboard has, when nothing can tell.
+//!
+//! A USB or Bluetooth keyboard carries its layout in the compositor's xkb keymap
+//! and a phone's own keyboard is identified by its profile, but neither covers
+//! every case - so this is the way for somebody to state it. An empty string
+//! restores "work it out".
+bool IMELunaService::handleSetHardwareKeyboardLayout(LSHandle *handle, LSMessage *message, void *data)
+{
+    Q_UNUSED(handle);
+
+    IMELunaService *service = static_cast<IMELunaService *>(data);
+
+    LSMessageAdapter msg(message);
+
+    if (!service->m_pluginManager) {
+        msg.replyError("No plugin manager; the keyboard layout cannot be set");
+        return true;
+    }
+
+    const QJsonObject payload(msg.getPayload());
+    const QJsonValue layout(payload.value(QStringLiteral("layout")));
+
+    if (!layout.isString()) {
+        msg.replyError("\"layout\" is required and must be a string;"
+                       " an empty one lets the hardware decide");
+        return true;
+    }
+
+    service->m_pluginManager->setKeyboardLayoutOverride(layout.toString());
+
+    QJsonObject response(service->getKeyboardStatusJson());
+    response.insert("returnValue", true);
+    msg.respond(response);
+
+    return true;
+}
+
+//! \brief Whether a telephone keypad counts as a hardware keyboard.
+//!
+//! Off by default, because a keypad has the digits and none of the letters:
+//! taking the on-screen keyboard away for one leaves no way to type a word. On a
+//! device whose keypad is meant to be typed on by multi-tap, it is the point.
+bool IMELunaService::handleSetTelephoneKeypadCounts(LSHandle *handle, LSMessage *message, void *data)
+{
+    Q_UNUSED(handle);
+
+    IMELunaService *service = static_cast<IMELunaService *>(data);
+
+    LSMessageAdapter msg(message);
+
+    if (!service->m_pluginManager) {
+        msg.replyError("No plugin manager; telephone keypads cannot be configured");
+        return true;
+    }
+
+    const QJsonObject payload(msg.getPayload());
+    const QJsonValue counts(payload.value(QStringLiteral("counts")));
+
+    if (!counts.isBool()) {
+        msg.replyError("\"counts\" is required and must be a boolean");
+        return true;
+    }
+
+    service->m_pluginManager->setTelephoneKeypadCounts(counts.toBool());
+
+    QJsonObject response(service->getKeyboardStatusJson());
+    response.insert("returnValue", true);
+    msg.respond(response);
+
+    return true;
+}
+
 LSMethod IMELunaService::ime_bus_methods [] = {
     // Handlers for service methods for com.webos.service.ime
     {"registerRemoteKeyboard", IMELunaService::handleRegisterRemoteKeyboard, (LSMethodFlags) 0},
     {"insertText", IMELunaService::handleInsertText, (LSMethodFlags) 0},
     {"deleteCharacters", IMELunaService::handleDeleteCharacters, (LSMethodFlags) 0},
     {"sendEnterKey", IMELunaService::handleSendEnterKey, (LSMethodFlags) 0},
+    {"getKeyboardStatus", IMELunaService::handleGetKeyboardStatus, (LSMethodFlags) 0},
+    {"setOnScreenKeyboardForced", IMELunaService::handleSetOnScreenKeyboardForced, (LSMethodFlags) 0},
+    {"setHardwareKeyboardLayout", IMELunaService::handleSetHardwareKeyboardLayout, (LSMethodFlags) 0},
+    {"setTelephoneKeypadCounts", IMELunaService::handleSetTelephoneKeypadCounts, (LSMethodFlags) 0},
 
     {nullptr, nullptr, (LSMethodFlags) 0}
 };

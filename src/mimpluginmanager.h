@@ -116,13 +116,103 @@ public:
                                                  const QVariantMap &attributes);
 
 Q_SIGNALS:
+    //! Emitted when the hardware keyboard status, or the override above, moves.
+    void hardwareKeyboardStatusChanged();
+
     //! This signal is emitted when input method plugins are loaded, unloaded,
     //! enabled or disabled
     void pluginsChanged();
 
     void pluginLoaded();
 
+public:
+    //! \brief Whether a physical keyboard is attached.
+    bool hardwareKeyboardPresent() const;
+
+    //! \brief Whether one is attached and can be typed on right now.
+    bool hardwareKeyboardUsable() const;
+
+    //! \brief Whether the keyboard slides or folds away; see
+    //!        MImHwKeyboardTracker::hasSwitch().
+    bool hardwareKeyboardIsSlider() const;
+
+    /*! \brief Whether the on-screen keyboard has been asked for anyway.
+     *
+     * A physical keyboard normally takes the on-screen one away. This is the way
+     * back for the things it cannot do - an emoji, a script it has no keys for, a
+     * key the hardware is missing - and it sticks until it is turned off again,
+     * which is how LunaSysMgr's own keyboard key behaved.
+     */
+    bool onScreenKeyboardForced() const;
+
+    /*! \brief The physical keyboard's layout, as declared for this device.
+     *
+     * Empty when nothing declared one, which is the normal case. It cannot be
+     * worked out instead: evdev scancodes are positional, so a QWERTZ keyboard
+     * and a QWERTY one advertise exactly the same keys, and a USB or Bluetooth
+     * keyboard carries its layout in the compositor's xkb keymap rather than
+     * anywhere this can see. Legacy declared it per device too - the KEYoBRD
+     * token - and this is the same thing said in a settings key.
+     */
+    QString hardwareKeyboardLayout() const;
+
+    /*! \brief The digits printed on the keyboard's key faces, by scancode.
+     *
+     * Empty unless a plugin has said. For the things that take digits without an
+     * input method - the lock screen's PIN pad runs inside the compositor, where
+     * no plugin ever sees the keys, so it substitutes them itself.
+     */
+    QVariantMap hardwareKeyFaceDigits() const;
+
+    //! \brief The layout override, or empty when the hardware decides.
+    QString keyboardLayoutOverride() const;
+
+    //! \brief Whether a telephone keypad counts as a hardware keyboard.
+    bool telephoneKeypadCounts() const;
+
+    /*! \brief The layout this device declares, ignoring the settings override.
+     *
+     * Read from a file rather than a setting because it is a fact about the
+     * hardware, not a preference: on LuneOS one rootfs boots every device, so it
+     * is bind-mounted into place during boot by luneos-device-config's
+     * 77-hwkeyboard-layout generator, from deviceinfo_keyboard_layout in the
+     * adaptation. The shipped file is all comment, which is how a device that
+     * declares nothing says so. MALIIT_HWKEYBOARD_LAYOUT_FILE overrides the
+     * path.
+     */
+    static QString declaredKeyboardLayout();
+
 public Q_SLOTS:
+    void setOnScreenKeyboardForced(bool forced);
+
+    /*! \brief Records the layout the active plugin identified, and reports it on.
+     *
+     * Preferred over the device's declaration because it names the keyboard that
+     * is actually attached rather than the one the device usually has, and a
+     * plugin only knows it by having matched the input device. Empty clears it.
+     */
+    void setHardwareKeyboardLayout(const QString &layout);
+
+    //! \brief Records the digits the active plugin read off the key faces.
+    void setHardwareKeyFaceDigits(const QVariantMap &digits);
+
+    /*! \brief Overrides the layout the keyboard is taken to have.
+     *
+     * Empty restores "work it out" - the plugin's answer, then the device's own
+     * declaration. For the keyboard nothing can identify: a USB or Bluetooth one
+     * carries its layout in the compositor's xkb keymap, which is nowhere this
+     * can see, so somebody has to be able to say.
+     */
+    void setKeyboardLayoutOverride(const QString &layout);
+
+    /*! \brief Whether a telephone keypad counts as a hardware keyboard.
+     *
+     * Off by default: a keypad has the digits and no letters, so taking the
+     * on-screen keyboard away for one leaves no way to type a word. On a device
+     * whose keypad is meant to be typed on by multi-tap, it is the whole point.
+     */
+    void setTelephoneKeypadCounts(bool counts);
+
     //! Show active plugins.
     void showActivePlugins();
 
@@ -136,6 +226,9 @@ private Q_SLOTS:
 
     //! Update and activate input source.
     void updateInputSource();
+
+    //! Apply the hardware keyboard detection settings to the tracker.
+    void updateHwKeyboardPolicy();
 
     //! Set toolbar to active plugin with given \a id
     void setToolbar(const MAttributeExtensionId &id);

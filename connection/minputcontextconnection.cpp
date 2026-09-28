@@ -37,6 +37,7 @@ namespace {
     const char * const WinId = "winId";
     const char * const CursorRectAttribute = "cursorRectangle";
     const char * const HiddenTextAttribute = "hiddenText";
+    const char * const OnScreenKeyboardAttribute = "onScreenKeyboardAllowed";
     const char * const PreeditClickPosAttribute = "preeditClickPos";
     const char * const MaxTextLengthAttribute = "maxTextLength";
     const char * const PlatformDataAttribute = "platformData";
@@ -103,6 +104,28 @@ bool MInputContextConnection::predictionEnabled(bool &valid)
     QVariant predictionVariant = widgetState[PredictionAttribute];
     valid = predictionVariant.isValid();
     return predictionVariant.toBool();
+}
+
+/*
+ * Whether the focused field will accept an on-screen keyboard at all.
+ *
+ * Qt has no hint for this, so webOS reserves a bit of its own; see
+ * MInputContextWestonIMProtocolConnection, which is where it is read off the
+ * content hint, and qtwayland-webos, which is where a field sets it.
+ *
+ * It has to come this far because the place that would usually decide cannot:
+ * the platform input context activates the text model when a field takes
+ * focus, and activation is what puts the keys up, so a field with a keypad of
+ * its own had no way to be focused without one appearing over it.
+ *
+ * True where nothing was said, so a field that does not mention it behaves as
+ * every field always has.
+ */
+bool MInputContextConnection::onScreenKeyboardAllowed(bool &valid)
+{
+    QVariant allowedVariant = widgetState[OnScreenKeyboardAttribute];
+    valid = allowedVariant.isValid();
+    return valid ? allowedVariant.toBool() : true;
 }
 
 bool MInputContextConnection::autoCapitalizationEnabled(bool &valid)
