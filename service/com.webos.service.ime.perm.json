@@ -39,5 +39,9 @@
     ],
     "com.palm.webappmanager": [
         "ime.query"
+    ],
+    "org.webosports.app.settings.textassist*": [
+        "ime.query",
+        "ime.operation"
     ]
 }
