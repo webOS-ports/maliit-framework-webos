@@ -137,7 +137,7 @@ IMELunaService::IMELunaService(QSharedPointer<MInputContextConnection> connectio
     connect(m_broadcastTimer, &QTimer::timeout, this, &IMELunaService::broadcastWidgetState);
     if (m_pluginManager) {
         connect(m_pluginManager, &MIMPluginManager::hardwareKeyboardStatusChanged,
-                this, &IMELunaService::onHardwareKeyboardStatusChanged);
+                this, &IMELunaService::onKeyboardStatusChanged);
     }
 
 }
@@ -300,6 +300,16 @@ void IMELunaService::broadcastWidgetState()
 
     m_focusChangedSinceLastBroadcast = false;
     m_lastWidgetState = widgetState;
+
+    // The keyboard status carries inputFocus, so a field taking or losing the
+    // focus moves it as surely as plugging a keyboard in does - and it is a
+    // different subscription, on a different key, which nothing here was
+    // telling. Subscribers to getKeyboardStatus were left with whatever the
+    // answer had been when they subscribed, which for the shell's cut/copy/
+    // paste overlay meant inputFocus false for ever and an overlay that could
+    // never come up. Cheap to call from here: it compares against the last
+    // status and says nothing when the answer has not moved.
+    onKeyboardStatusChanged();
 }
 
 void IMELunaService::onReset()
@@ -658,10 +668,19 @@ QJsonObject IMELunaService::getKeyboardStatusJson() const
     status.insert("hardwareKeyboard", hardware);
     status.insert("onScreenKeyboardForced", m_pluginManager->onScreenKeyboardForced());
 
+    // Whether a text field currently holds the input method's focus. The shell
+    // shows its cut/copy/paste overlay only where there is something to edit,
+    // the way legacy's enyo.EditMenu greyed its own items out
+    // (autoDisableItems). False rather than absent when the connection cannot
+    // say, so a caller never has to tell "no field" from "old server".
+    bool focusValid = false;
+    const bool focused = m_connection ? m_connection->focusState(focusValid) : false;
+    status.insert("inputFocus", focusValid && focused);
+
     return status;
 }
 
-void IMELunaService::onHardwareKeyboardStatusChanged()
+void IMELunaService::onKeyboardStatusChanged()
 {
     const QJsonObject status(getKeyboardStatusJson());
 

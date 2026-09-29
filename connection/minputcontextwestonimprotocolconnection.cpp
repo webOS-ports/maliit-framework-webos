@@ -302,6 +302,10 @@ const struct XkbQtKey g_XkbQtMediaMap[] = {
     { Qt::Key_AudioForward,     Qt::Key_AudioForward },
 };
 
+//! What xkb adds to an evdev keycode. wl_keyboard.key carries the raw evdev
+//! code; xkb, X11 and QKeyEvent::nativeScanCode() all carry it offset by 8.
+const uint32_t EVDEV_OFFSET = 8;
+
 xkb_keysym_t qtKeyToXkbKey(int qtkey)
 {
     unsigned i;
@@ -456,6 +460,8 @@ struct MInputContextWestonIMProtocolConnectionPrivate
     void handleInputMethodContextPlatformData(const char *pattern);
 
     void releaseInputMethodContext();
+
+    void sendRawKeyEvent(const QKeyEvent &keyEvent);
 
     void processKeyMap(uint32_t format, int fd, uint32_t size);
     void processKeyEvent(uint32_t serial, uint32_t time, uint32_t key, uint32_t state);
@@ -1172,6 +1178,38 @@ static bool is_lgremote_asterisk(uint32_t key)
 }
 #endif
 
+/*! \brief Hands a key back to the application as a real key event.
+ *
+ * The counterpart of the grab: keys the input method took but did not consume
+ * are returned through input_method_context.key, and the compositor delivers
+ * them to the focused surface as wl_keyboard.key. The modifiers go first, and
+ * in the same call, because the grab diverts wl_keyboard.modifiers too - the
+ * client's own modifier state is empty for as long as the input method holds
+ * the keyboard, so a key sent without them arrives unmodified.
+ */
+void MInputContextWestonIMProtocolConnectionPrivate::sendRawKeyEvent(const QKeyEvent &keyEvent)
+{
+    if (!im_context)
+        return;
+
+    const wl_keyboard_key_state state =
+        keyEvent.type() == QEvent::KeyRelease ? WL_KEYBOARD_KEY_STATE_RELEASED
+                                              : WL_KEYBOARD_KEY_STATE_PRESSED;
+
+    const xkb_mod_mask_t mod_mask = mods.fromQt(keyEvent.modifiers());
+
+    unsigned long long timestamp = keyEvent.timestamp();
+    if (timestamp > UINT_MAX)
+        timestamp = 0;
+
+    qDebug() << "raw key: scancode" << keyEvent.nativeScanCode()
+             << "state" << state << "mod mask" << mod_mask;
+
+    input_method_context_modifiers(im_context, im_serial, mod_mask, 0, 0, 0);
+    input_method_context_key(im_context, im_serial, (uint32_t) timestamp,
+                             keyEvent.nativeScanCode() - EVDEV_OFFSET, state);
+}
+
 void MInputContextWestonIMProtocolConnectionPrivate::processKeyEvent(uint32_t serial, uint32_t time, uint32_t key, uint32_t state)
 {
     Q_Q(MInputContextWestonIMProtocolConnection);
@@ -1184,8 +1222,6 @@ void MInputContextWestonIMProtocolConnectionPrivate::processKeyEvent(uint32_t se
         // So for this case escape here and do not send this event to plugins.
         return;
     }
-
-    const uint32_t EVDEV_OFFSET = 8;
 
     QEvent::Type keyType = (state == WL_KEYBOARD_KEY_STATE_RELEASED ? QEvent::KeyRelease : QEvent::KeyPress);
 #ifdef HAS_LIBIM
@@ -1648,6 +1684,31 @@ void MInputContextWestonIMProtocolConnection::sendCommitString(const QString &st
 }
 
 
+namespace {
+
+//! \brief Is this key one that only selects a shortcut level?
+//!
+//! Sent back as a real key event along with the shortcuts themselves, so that
+//! the application tracks the modifier from the same events it would have seen
+//! had no input method been running. Shift and CapsLock are deliberately not
+//! here: they select a character rather than a command, the input method
+//! resolves them itself, and the shortcuts that do involve Shift carry it in
+//! the modifier mask anyway.
+bool isShortcutModifierKey(int qtKey)
+{
+    switch (qtKey) {
+    case Qt::Key_Control:
+    case Qt::Key_Alt:
+    case Qt::Key_AltGr:
+    case Qt::Key_Meta:
+        return true;
+    default:
+        return false;
+    }
+}
+
+} // namespace
+
 void MInputContextWestonIMProtocolConnection::sendKeyEvent(const QKeyEvent &keyEvent,
                                                            Maliit::EventRequestType requestType)
 {
@@ -1657,6 +1718,37 @@ void MInputContextWestonIMProtocolConnection::sendKeyEvent(const QKeyEvent &keyE
              << "requestType:" << requestType;
 
     if (d->im_context) {
+        // Keyboard shortcuts go back as real key events, everything else as a
+        // keysym.
+        //
+        // text_model.keysym is the client asking the input method what was
+        // typed, and a client is free to act only on what it understands.
+        // Chromium acts on an unmodified keysym and ignores one that carries
+        // Ctrl, Alt or Meta, so Ctrl+C, Ctrl+V and every other shortcut
+        // reached no web application at all - they were sent, and nothing
+        // became of them.
+        //
+        // input_method_context.key has no such ambiguity: the compositor
+        // delivers it to the focused surface as an ordinary wl_keyboard.key,
+        // indistinguishable from the key the client would have received had
+        // the input method not grabbed the keyboard, and the client's own
+        // shortcut handling does the rest. The modifiers have to be restated
+        // with it because the grab diverts wl_keyboard.modifiers away from the
+        // client as well, leaving it believing nothing is held down.
+        //
+        // Needs the physical key, which is only present when the event came
+        // from a real keyboard; a shortcut synthesised by a plugin has no
+        // scancode to send and keeps the keysym path.
+        const bool isShortcut =
+            (keyEvent.modifiers() & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier))
+            || isShortcutModifierKey(keyEvent.key());
+
+        if (isShortcut && keyEvent.nativeScanCode() >= EVDEV_OFFSET) {
+            d->sendRawKeyEvent(keyEvent);
+            MInputContextConnection::sendKeyEvent(keyEvent, requestType);
+            return;
+        }
+
         xkb_keysym_t key_sym(qtKeyToXkbKey(keyEvent.key()));
 
         if (!key_sym) {
