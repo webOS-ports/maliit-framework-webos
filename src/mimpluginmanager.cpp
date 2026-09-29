@@ -312,6 +312,26 @@ void MIMPluginManagerPrivate::activatePlugin(Maliit::Plugins::InputMethodPlugin 
     inputMethod = plugins.value(plugin).inputMethod;
     plugins.value(plugin).imHost->setEnabled(true);
 
+    /*
+     * The group goes active with the plugin, not later.
+     *
+     * Being made active is by itself enough to make a plugin put its panel up:
+     * replacePlugin() calls setState() on the plugin the moment this returns,
+     * and an input method that has a field waiting for it shows itself there.
+     * A window shown while the group is still inactive is force-hidden again by
+     * WindowGroup::onVisibleChanged - "An inactive plugin is misbehaving" - and
+     * what that leaves behind is worse than a panel that did not appear: the
+     * plugin has been told nothing, so it goes on believing it has a panel on
+     * screen, and the window's own state and the platform window below it are
+     * left disagreeing, after which nothing can show that window again.
+     *
+     * The group used to be activated by ensureActivePluginsVisible(), which runs
+     * after setState() and only when the input method is already visible - so on
+     * the first field focused after startup, the one time it matters most, it did
+     * not run at all.
+     */
+    plugins.value(plugin).windowGroup->activate();
+
     Q_ASSERT(inputMethod);
 
     QObject::connect(inputMethod,
@@ -511,6 +531,11 @@ void MIMPluginManagerPrivate::deactivatePlugin(Maliit::Plugins::InputMethodPlugi
     plugins[plugin].state = PluginState();
     QObject::disconnect(inputMethod, nullptr, q, nullptr);
     targets.remove(inputMethod);
+
+    // And inactive with it, which is what ensureActivePluginsVisible() does to
+    // every plugin that is not active anyway. Last, so that the hide above is
+    // the plugin taking its own panel down rather than having it taken.
+    plugins.value(plugin).windowGroup->deactivate(Maliit::WindowGroup::HideImmediate);
 }
 
 void MIMPluginManagerPrivate::replacePlugin(Maliit::SwitchDirection direction,
