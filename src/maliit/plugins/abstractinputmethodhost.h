@@ -407,6 +407,16 @@ public:
      */
     virtual void setHardwareKeyFaceDigits(const QVariantMap &digits) { Q_UNUSED(digits); }
 
+    /*! \brief Says which word at the caret is misspelled, and what could replace it.
+     *
+     * Offered by the plugin, which holds the dictionary: the shell shows the
+     * suggestions where the user tapped, and the input method service applies the
+     * one chosen. \a word is empty, and \a suggestions with it, when the caret is
+     * not in a misspelled word.
+     */
+    virtual void setSpellingSuggestions(const QString &word, const QStringList &suggestions)
+    { Q_UNUSED(word); Q_UNUSED(suggestions); }
+
 private:
     Q_DISABLE_COPY(MAbstractInputMethodHost)
     Q_DECLARE_PRIVATE(MAbstractInputMethodHost)

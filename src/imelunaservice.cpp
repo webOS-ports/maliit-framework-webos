@@ -30,6 +30,7 @@
 const char *IMELunaService::SubscriberKey = "REMOTE_KEYBOARD_LIST";
 const char *IMELunaService::KeyboardStatusSubscriberKey = "KEYBOARD_STATUS_LIST";
 
+#include <QJsonArray>
 #include <QJsonObject>
 #include <utility>
 
@@ -345,6 +346,59 @@ void IMELunaService::insertText(const QString& text, bool replace, int length)
     }
 }
 
+namespace {
+
+// What counts as part of a word when finding the one at the caret. The same rule
+// the keyboard plugin uses to find the misspelling it reports, so that the two
+// agree on where the word is; the check against the reported word below is what
+// makes a disagreement harmless.
+bool isWordCharacter(const QString &text, int index)
+{
+    const QChar c = text.at(index);
+
+    if (c.isLetter())
+        return true;
+
+    // An apostrophe inside a word - don't, it's - and not one that quotes it.
+    return (c == QLatin1Char('\'') || c == QChar(0x2019))
+            && index > 0 && index + 1 < text.length()
+            && text.at(index - 1).isLetter() && text.at(index + 1).isLetter();
+}
+
+} // namespace
+
+// Replace the misspelled word the caret is in with \a suggestion.
+bool IMELunaService::applySpellingSuggestion(const QString& suggestion)
+{
+    QString text;
+    int cursor = 0;
+
+    if (!m_connection->surroundingText(text, cursor) || cursor < 0 || cursor > text.length()) {
+        qWarning() << "no usable surrounding text, cannot apply a spelling suggestion";
+        return false;
+    }
+
+    int start = cursor;
+    int end = cursor;
+
+    while (start > 0 && isWordCharacter(text, start - 1))
+        --start;
+    while (end < text.length() && isWordCharacter(text, end))
+        ++end;
+
+    if (start == end)
+        return false;
+
+    // Only the word the shell was told about. The caret may have moved on since
+    // the suggestions were shown, and replacing whatever word it is in now would
+    // be putting a correction somewhere nobody asked for one.
+    if (text.mid(start, end - start) != m_pluginManager->spellingWord())
+        return false;
+
+    m_connection->sendCommitString(suggestion, start - cursor, end - start);
+    return true;
+}
+
 // Delete characters at the current cursor position, or all selected text (if any)
 void IMELunaService::deleteCharacters(int numChars, DeleteMode mode)
 {
@@ -529,6 +583,45 @@ bool IMELunaService::handleInsertText(LSHandle *handle, LSMessage *message, void
 }
 
 /*
+ * Handler for LS2 service method palm://com.webos.service.ime/applySpellingSuggestion
+ *
+ * Replaces the misspelled word the caret is in with one of the suggestions
+ * getKeyboardStatus reported for it. Refused if the caret is no longer in that word.
+ *
+ * Example:
+ *   luna-send -n 1 palm://com.webos.service.ime/applySpellingSuggestion '{"suggestion": "the"}'
+ *
+ * Parameters:
+ *   suggestion - string (required). The replacement.
+ *
+ * Return payload:
+ *   returnValue - boolean (required)
+ *   errorText - string (optional)
+ */
+bool IMELunaService::handleApplySpellingSuggestion(LSHandle *handle, LSMessage *message, void *data)
+{
+    Q_UNUSED(handle);
+
+    IMELunaService *service = static_cast<IMELunaService *>(data);
+    LSMessageAdapter msg(message);
+
+    const QJsonValue suggestion = msg.getPayload()["suggestion"];
+
+    if (!suggestion.isString() || suggestion.toString().isEmpty()) {
+        msg.replyError("Missing \"suggestion\" parameter");
+        return true;
+    }
+
+    if (!service->applySpellingSuggestion(suggestion.toString())) {
+        msg.replyError("The caret is not in the word the suggestion was for");
+        return true;
+    }
+
+    msg.replyTrue();
+    return true;
+}
+
+/*
  * Handler for LS2 service method palm://com.webos.service.ime/deleteCharacters
  *
  * Deletes characters from the current insertion point.
@@ -691,6 +784,19 @@ QJsonObject IMELunaService::getKeyboardStatusJson() const
                          m_connection->surroundingText(surroundingText, cursorPosition) &&
                          !surroundingText.isEmpty();
     status.insert("inputHasText", focused && hasText);
+
+    // The misspelled word the caret is in, with what the plugin would put in its
+    // place, for the shell's suggestion pill. Empty when the caret is in none, and
+    // nothing at all when no field holds the focus.
+    // Never from a field that hides what is typed in it, whatever the plugin says:
+    // this is a word of the user's own text, going out on a bus.
+    bool hiddenValid = false;
+    const bool hiddenField = m_connection && m_connection->hiddenText(hiddenValid) && hiddenValid;
+    const bool fieldFocused = focusValid && focused && !hiddenField;
+    status.insert("spellingWord", fieldFocused ? m_pluginManager->spellingWord() : QString());
+    status.insert("spellingSuggestions",
+                  fieldFocused ? QJsonArray::fromStringList(m_pluginManager->spellingSuggestions())
+                               : QJsonArray());
 
     return status;
 }
@@ -863,6 +969,7 @@ LSMethod IMELunaService::ime_bus_methods [] = {
     // Handlers for service methods for com.webos.service.ime
     {"registerRemoteKeyboard", IMELunaService::handleRegisterRemoteKeyboard, (LSMethodFlags) 0},
     {"insertText", IMELunaService::handleInsertText, (LSMethodFlags) 0},
+    {"applySpellingSuggestion", IMELunaService::handleApplySpellingSuggestion, (LSMethodFlags) 0},
     {"deleteCharacters", IMELunaService::handleDeleteCharacters, (LSMethodFlags) 0},
     {"sendEnterKey", IMELunaService::handleSendEnterKey, (LSMethodFlags) 0},
     {"getKeyboardStatus", IMELunaService::handleGetKeyboardStatus, (LSMethodFlags) 0},

@@ -202,6 +202,10 @@ public:
     //! What the active plugin says is printed on the key faces; see
     //! MIMPluginManager::setHardwareKeyFaceDigits().
     QVariantMap pluginKeyFaceDigits;
+    //! The misspelling at the caret the active plugin reported, and its
+    //! suggestions; see MIMPluginManager::setSpellingSuggestions().
+    QString pluginSpellingWord;
+    QStringList pluginSpellingSuggestions;
     MImSettings *shutDownInterval = nullptr;
     MImSettings *isStaticService = nullptr;
 

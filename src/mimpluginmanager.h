@@ -164,6 +164,12 @@ public:
      */
     QVariantMap hardwareKeyFaceDigits() const;
 
+    //! \brief The misspelled word the caret is in, empty when it is in none.
+    QString spellingWord() const;
+
+    //! \brief What the active plugin would put in its place, best first.
+    QStringList spellingSuggestions() const;
+
     //! \brief The layout override, or empty when the hardware decides.
     QString keyboardLayoutOverride() const;
 
@@ -195,6 +201,9 @@ public Q_SLOTS:
 
     //! \brief Records the digits the active plugin read off the key faces.
     void setHardwareKeyFaceDigits(const QVariantMap &digits);
+
+    //! \brief Records the misspelling at the caret, as the active plugin sees it.
+    void setSpellingSuggestions(const QString &word, const QStringList &suggestions);
 
     /*! \brief Overrides the layout the keyboard is taken to have.
      *

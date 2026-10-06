@@ -70,11 +70,13 @@ protected:
     QJsonObject getWidgetStateJson() const;
     QJsonObject getKeyboardStatusJson() const;
     void insertText(const QString& text, bool replace, int length = 0);
+    bool applySpellingSuggestion(const QString& suggestion);
     void deleteCharacters(int numChars, DeleteMode mode);
     void sendEnterKey();
 
     static bool handleRegisterRemoteKeyboard(LSHandle *handle, LSMessage *message, void *data);
     static bool handleInsertText(LSHandle *handle, LSMessage *message, void *data);
+    static bool handleApplySpellingSuggestion(LSHandle *handle, LSMessage *message, void *data);
     static bool handleDeleteCharacters(LSHandle *handle, LSMessage *message, void *data);
     static bool handleSendEnterKey(LSHandle *handle, LSMessage *message, void *data);
     static bool handleGetKeyboardStatus(LSHandle *handle, LSMessage *message, void *data);
