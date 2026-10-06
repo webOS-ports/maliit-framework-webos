@@ -175,6 +175,13 @@ public:
      */
     virtual void handleClientChange();
 
+    /*! \brief Asks the plugin to add \a word to its user dictionary.
+     *
+     * Sent when the user chooses "+" beside a misspelled word. The default
+     * implementation does nothing, as for a plugin with no dictionary.
+     */
+    virtual void learnWord(const QString &word);
+
     /*!
      * \brief Switch context to given direction
      *

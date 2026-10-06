@@ -399,6 +399,19 @@ bool IMELunaService::applySpellingSuggestion(const QString& suggestion)
     return true;
 }
 
+// Add the misspelled word the caret is in to the user dictionary.
+bool IMELunaService::learnSpellingWord(const QString& word)
+{
+    // Only the word the shell was told about, and only one the plugin said could
+    // be learned: the shell cannot add arbitrary words to a dictionary, nor the
+    // word a keyboard itself put in someone's text.
+    if (word.isEmpty() || word != m_pluginManager->spellingWord() || !m_pluginManager->spellingCanLearn())
+        return false;
+
+    m_pluginManager->learnWord(word);
+    return true;
+}
+
 // Delete characters at the current cursor position, or all selected text (if any)
 void IMELunaService::deleteCharacters(int numChars, DeleteMode mode)
 {
@@ -622,6 +635,45 @@ bool IMELunaService::handleApplySpellingSuggestion(LSHandle *handle, LSMessage *
 }
 
 /*
+ * Handler for LS2 service method palm://com.webos.service.ime/learnWord
+ *
+ * Adds the misspelled word the caret is in to the user dictionary, so that it is
+ * no longer marked or corrected. Refused for any other word.
+ *
+ * Example:
+ *   luna-send -n 1 palm://com.webos.service.ime/learnWord '{"word": "luneos"}'
+ *
+ * Parameters:
+ *   word - string (required). The word getKeyboardStatus reported.
+ *
+ * Return payload:
+ *   returnValue - boolean (required)
+ *   errorText - string (optional)
+ */
+bool IMELunaService::handleLearnWord(LSHandle *handle, LSMessage *message, void *data)
+{
+    Q_UNUSED(handle);
+
+    IMELunaService *service = static_cast<IMELunaService *>(data);
+    LSMessageAdapter msg(message);
+
+    const QJsonValue word = msg.getPayload()["word"];
+
+    if (!word.isString() || word.toString().isEmpty()) {
+        msg.replyError("Missing \"word\" parameter");
+        return true;
+    }
+
+    if (!service->learnSpellingWord(word.toString())) {
+        msg.replyError("That is not a word that can be added to the dictionary");
+        return true;
+    }
+
+    msg.replyTrue();
+    return true;
+}
+
+/*
  * Handler for LS2 service method palm://com.webos.service.ime/deleteCharacters
  *
  * Deletes characters from the current insertion point.
@@ -793,6 +845,7 @@ QJsonObject IMELunaService::getKeyboardStatusJson() const
     bool hiddenValid = false;
     const bool hiddenField = m_connection && m_connection->hiddenText(hiddenValid) && hiddenValid;
     const bool fieldFocused = focusValid && focused && !hiddenField;
+    status.insert("spellingCanLearn", fieldFocused && m_pluginManager->spellingCanLearn());
     status.insert("spellingWord", fieldFocused ? m_pluginManager->spellingWord() : QString());
     status.insert("spellingSuggestions",
                   fieldFocused ? QJsonArray::fromStringList(m_pluginManager->spellingSuggestions())
@@ -984,6 +1037,7 @@ LSMethod IMELunaService::ime_bus_methods [] = {
     {"registerRemoteKeyboard", IMELunaService::handleRegisterRemoteKeyboard, (LSMethodFlags) 0},
     {"insertText", IMELunaService::handleInsertText, (LSMethodFlags) 0},
     {"applySpellingSuggestion", IMELunaService::handleApplySpellingSuggestion, (LSMethodFlags) 0},
+    {"learnWord", IMELunaService::handleLearnWord, (LSMethodFlags) 0},
     {"deleteCharacters", IMELunaService::handleDeleteCharacters, (LSMethodFlags) 0},
     {"sendEnterKey", IMELunaService::handleSendEnterKey, (LSMethodFlags) 0},
     {"getKeyboardStatus", IMELunaService::handleGetKeyboardStatus, (LSMethodFlags) 0},

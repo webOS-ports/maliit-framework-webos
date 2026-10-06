@@ -170,6 +170,9 @@ public:
     //! \brief What the active plugin would put in its place, best first.
     QStringList spellingSuggestions() const;
 
+    //! \brief Whether that word may be added to the user dictionary.
+    bool spellingCanLearn() const;
+
     //! \brief The layout override, or empty when the hardware decides.
     QString keyboardLayoutOverride() const;
 
@@ -203,7 +206,10 @@ public Q_SLOTS:
     void setHardwareKeyFaceDigits(const QVariantMap &digits);
 
     //! \brief Records the misspelling at the caret, as the active plugin sees it.
-    void setSpellingSuggestions(const QString &word, const QStringList &suggestions);
+    void setSpellingSuggestions(const QString &word, const QStringList &suggestions, bool canLearn);
+
+    //! \brief Asks the active plugins to add \a word to the user dictionary.
+    void learnWord(const QString &word);
 
     /*! \brief Overrides the layout the keyboard is taken to have.
      *

@@ -412,10 +412,13 @@ public:
      * Offered by the plugin, which holds the dictionary: the shell shows the
      * suggestions where the user tapped, and the input method service applies the
      * one chosen. \a word is empty, and \a suggestions with it, when the caret is
-     * not in a misspelled word.
+     * not in a misspelled word. \a canLearn says the word may be added to the
+     * user dictionary - it is a misspelling, not a word the keyboard itself
+     * replaced - which is what the shell's "+" is for.
      */
-    virtual void setSpellingSuggestions(const QString &word, const QStringList &suggestions)
-    { Q_UNUSED(word); Q_UNUSED(suggestions); }
+    virtual void setSpellingSuggestions(const QString &word, const QStringList &suggestions,
+                                        bool canLearn)
+    { Q_UNUSED(word); Q_UNUSED(suggestions); Q_UNUSED(canLearn); }
 
 private:
     Q_DISABLE_COPY(MAbstractInputMethodHost)

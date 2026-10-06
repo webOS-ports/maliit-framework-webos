@@ -206,6 +206,7 @@ public:
     //! suggestions; see MIMPluginManager::setSpellingSuggestions().
     QString pluginSpellingWord;
     QStringList pluginSpellingSuggestions;
+    bool pluginSpellingCanLearn = false;
     MImSettings *shutDownInterval = nullptr;
     MImSettings *isStaticService = nullptr;
 
