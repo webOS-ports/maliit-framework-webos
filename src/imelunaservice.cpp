@@ -798,6 +798,20 @@ QJsonObject IMELunaService::getKeyboardStatusJson() const
                   fieldFocused ? QJsonArray::fromStringList(m_pluginManager->spellingSuggestions())
                                : QJsonArray());
 
+    // Where the caret is, in the client's own coordinates, so that the pill can
+    // be put at the word as legacy's spelling widget was rather than wherever
+    // the finger happened to land. Only with a misspelling to point at.
+    bool rectValid = false;
+    const QRect caret = m_connection ? m_connection->cursorRectangle(rectValid) : QRect();
+    if (fieldFocused && !m_pluginManager->spellingWord().isEmpty() && rectValid && caret.isValid()) {
+        QJsonObject rect;
+        rect.insert("x", caret.x());
+        rect.insert("y", caret.y());
+        rect.insert("width", caret.width());
+        rect.insert("height", caret.height());
+        status.insert("spellingRect", rect);
+    }
+
     return status;
 }
 
