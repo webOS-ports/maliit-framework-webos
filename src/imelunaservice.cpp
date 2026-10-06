@@ -677,6 +677,21 @@ QJsonObject IMELunaService::getKeyboardStatusJson() const
     const bool focused = m_connection ? m_connection->focusState(focusValid) : false;
     status.insert("inputFocus", focusValid && focused);
 
+    // What the shell's cut/copy/paste overlay needs to choose its items, the
+    // way legacy's did: Cut and Copy only when something is selected, Select
+    // All and Paste when nothing is. Booleans only - the text itself is not
+    // something to put on a bus, least of all from a password field.
+    bool selectionValid = false;
+    const bool selected = m_connection ? m_connection->hasSelection(selectionValid) : false;
+    status.insert("inputHasSelection", focused && selectionValid && selected);
+
+    QString surroundingText;
+    int cursorPosition = 0;
+    const bool hasText = m_connection &&
+                         m_connection->surroundingText(surroundingText, cursorPosition) &&
+                         !surroundingText.isEmpty();
+    status.insert("inputHasText", focused && hasText);
+
     return status;
 }
 
