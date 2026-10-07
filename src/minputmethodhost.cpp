@@ -287,6 +287,12 @@ void MInputMethodHost::setHardwareKeyFaceDigits(const QVariantMap &digits)
     pluginManager->setHardwareKeyFaceDigits(digits);
 }
 
+void MInputMethodHost::setSpellingSuggestions(const QString &word, const QStringList &suggestions,
+                                              bool canLearn)
+{
+    pluginManager->setSpellingSuggestions(word, suggestions, canLearn);
+}
+
 int MInputMethodHost::instanceId() const
 {
     return MImGlobalSettings::instance()->getInstanceId();

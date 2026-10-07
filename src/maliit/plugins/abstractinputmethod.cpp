@@ -150,6 +150,12 @@ void MAbstractInputMethod::handleClientChange()
     // empty default implementation
 }
 
+void MAbstractInputMethod::learnWord(const QString &word)
+{
+    Q_UNUSED(word);
+    // empty default implementation
+}
+
 void MAbstractInputMethod::switchContext(Maliit::SwitchDirection direction,
                                          bool enableAnimation)
 {

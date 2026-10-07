@@ -1677,6 +1677,52 @@ void MIMPluginManager::setHardwareKeyFaceDigits(const QVariantMap &digits)
     Q_EMIT hardwareKeyboardStatusChanged();
 }
 
+QString MIMPluginManager::spellingWord() const
+{
+    Q_D(const MIMPluginManager);
+
+    return d->pluginSpellingWord;
+}
+
+QStringList MIMPluginManager::spellingSuggestions() const
+{
+    Q_D(const MIMPluginManager);
+
+    return d->pluginSpellingSuggestions;
+}
+
+bool MIMPluginManager::spellingCanLearn() const
+{
+    Q_D(const MIMPluginManager);
+
+    return d->pluginSpellingCanLearn;
+}
+
+void MIMPluginManager::learnWord(const QString &word)
+{
+    Q_FOREACH (MAbstractInputMethod *target, targets()) {
+        target->learnWord(word);
+    }
+}
+
+void MIMPluginManager::setSpellingSuggestions(const QString &word, const QStringList &suggestions,
+                                              bool canLearn)
+{
+    Q_D(MIMPluginManager);
+
+    if (d->pluginSpellingWord == word && d->pluginSpellingSuggestions == suggestions
+        && d->pluginSpellingCanLearn == canLearn)
+        return;
+
+    d->pluginSpellingWord = word;
+    d->pluginSpellingSuggestions = suggestions;
+    d->pluginSpellingCanLearn = canLearn;
+
+    // Carried in the keyboard status along with everything else the shell
+    // watches, and that status is what this signal sends out again.
+    Q_EMIT hardwareKeyboardStatusChanged();
+}
+
 void MIMPluginManager::setHardwareKeyboardLayout(const QString &layout)
 {
     Q_D(MIMPluginManager);

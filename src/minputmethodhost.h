@@ -113,6 +113,7 @@ public:
     virtual void setOnScreenKeyboardForced(bool forced);
     virtual void setHardwareKeyboardLayout(const QString &layout);
     virtual void setHardwareKeyFaceDigits(const QVariantMap &digits);
+    virtual void setSpellingSuggestions(const QString &word, const QStringList &suggestions, bool canLearn);
     // \reimp_end
 
 private:
