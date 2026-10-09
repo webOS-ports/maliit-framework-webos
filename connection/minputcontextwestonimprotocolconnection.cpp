@@ -52,6 +52,7 @@ const char * const CursorPositionAttribute = "cursorPosition";
 const char * const HasSelectionAttribute = "hasSelection";
 const char * const HiddenTextAttribute = "hiddenText";
 const char * const OnScreenKeyboardAttribute = "onScreenKeyboardAllowed";
+const char * const LowercasePreferredAttribute = "lowercasePreferred";
 
 /*
  * webOS reserves this bit of the content hint for "this field does not want an
@@ -1334,6 +1335,7 @@ void MInputContextWestonIMProtocolConnectionPrivate::handleInputMethodActivate(i
     //See GlobalInputMethod::show() in imemanager.
     state_info[ContentTypeAttribute] = Maliit::FreeTextContentType;
     state_info[OnScreenKeyboardAttribute] = true;
+    state_info[LowercasePreferredAttribute] = false;
     state_info[EnterKeyTypeAttribute] = Maliit::DefaultEnterKeyType;
 
     q->updateWidgetInformation(connection_id, state_info, true);
@@ -1456,6 +1458,7 @@ void MInputContextWestonIMProtocolConnectionPrivate::handleInputMethodContextCon
     // Reversed, because the hint names the refusal and the attribute names the
     // permission: a field that says nothing gets a keyboard, as it always did.
     state_info[OnScreenKeyboardAttribute] = !matchesFlag(hint, ContentHintNoInputPanel);
+    state_info[LowercasePreferredAttribute] = matchesFlag(hint, TEXT_MODEL_CONTENT_HINT_LOWERCASE);
     state_info[HiddenTextAttribute] = matchesFlag(hint, TEXT_MODEL_CONTENT_HINT_HIDDEN_TEXT)
         || matchesFlag(hint, TEXT_MODEL_CONTENT_HINT_PASSWORD)
         || matchesFlag(hint, TEXT_MODEL_CONTENT_HINT_SENSITIVE_DATA)
@@ -1629,6 +1632,13 @@ bool MInputContextWestonIMProtocolConnection::onScreenKeyboardAllowed(bool &vali
 {
     qDebug() << "valid:" << valid;
     bool result = MInputContextConnection::onScreenKeyboardAllowed(valid);
+    return result;
+}
+
+bool MInputContextWestonIMProtocolConnection::lowercasePreferred(bool &valid)
+{
+    qDebug() << "valid:" << valid;
+    bool result = MInputContextConnection::lowercasePreferred(valid);
     return result;
 }
 

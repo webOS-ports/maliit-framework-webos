@@ -87,6 +87,10 @@ public:
     //!        said nothing.
     virtual bool onScreenKeyboardAllowed(bool &valid);
 
+    //! \brief returns whether the focused field asked for lowercase
+    //!        (Qt::ImhPreferLowercase). False where the field said nothing.
+    virtual bool lowercasePreferred(bool &valid);
+
     /*!
      * \brief returns input method auto-capitalization hint if output parameter valid is true.
      */

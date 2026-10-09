@@ -420,6 +420,23 @@ public:
                                         bool canLearn)
     { Q_UNUSED(word); Q_UNUSED(suggestions); Q_UNUSED(canLearn); }
 
+    /*!
+     * Declared last so that the slots of everything above stay where they
+     * were for plugins built against an older header.
+     *
+     * \brief returns whether the focused field asked for lowercase, from
+     * Qt::ImhPreferLowercase, if output parameter valid is true.
+     *
+     * Auto-capitalisation is opt-in on the wire, so a field that turned it off
+     * and one that never mentioned it look the same; an input method that
+     * capitalises where nothing was said needs this to leave a field alone
+     * that asked for lowercase, a terminal for one.
+     *
+     * Not pure, and false by default: an input method host that predates
+     * this, or a field that says nothing, behaves exactly as it always has.
+     */
+    virtual bool lowercasePreferred(bool &valid) { valid = false; return false; }
+
 private:
     Q_DISABLE_COPY(MAbstractInputMethodHost)
     Q_DECLARE_PRIVATE(MAbstractInputMethodHost)

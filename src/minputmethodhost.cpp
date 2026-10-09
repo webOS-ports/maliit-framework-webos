@@ -79,6 +79,11 @@ bool MInputMethodHost::onScreenKeyboardAllowed(bool &valid)
     return connection->onScreenKeyboardAllowed(valid);
 }
 
+bool MInputMethodHost::lowercasePreferred(bool &valid)
+{
+    return connection->lowercasePreferred(valid);
+}
+
 bool MInputMethodHost::autoCapitalizationEnabled(bool &valid)
 {
     return connection->autoCapitalizationEnabled(valid);
