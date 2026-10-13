@@ -38,6 +38,7 @@ namespace {
     const char * const CursorRectAttribute = "cursorRectangle";
     const char * const HiddenTextAttribute = "hiddenText";
     const char * const OnScreenKeyboardAttribute = "onScreenKeyboardAllowed";
+    const char * const LowercasePreferredAttribute = "lowercasePreferred";
     const char * const PreeditClickPosAttribute = "preeditClickPos";
     const char * const MaxTextLengthAttribute = "maxTextLength";
     const char * const PlatformDataAttribute = "platformData";
@@ -126,6 +127,24 @@ bool MInputContextConnection::onScreenKeyboardAllowed(bool &valid)
     QVariant allowedVariant = widgetState[OnScreenKeyboardAttribute];
     valid = allowedVariant.isValid();
     return valid ? allowedVariant.toBool() : true;
+}
+
+/*
+ * Whether the focused field asked for lowercase, Qt::ImhPreferLowercase.
+ *
+ * It is the one positive way a field can say "no capitals": auto-capitalisation
+ * is opt-in on the wire, so a field that turned it off and a field that never
+ * mentioned it (most web content) send the same content hint, and an input
+ * method that falls back to capitalising where nothing was said cannot tell
+ * them apart. A terminal asks for this.
+ *
+ * False where nothing was said.
+ */
+bool MInputContextConnection::lowercasePreferred(bool &valid)
+{
+    QVariant lowercaseVariant = widgetState[LowercasePreferredAttribute];
+    valid = lowercaseVariant.isValid();
+    return valid && lowercaseVariant.toBool();
 }
 
 bool MInputContextConnection::autoCapitalizationEnabled(bool &valid)
