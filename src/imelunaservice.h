@@ -66,6 +66,8 @@ protected:
     void broadcastWidgetState();
     void broadcastToSubscribers(const QJsonObject& response);
     bool hasSubscribers() const;
+    //! Whether anyone is subscribed to getKeyboardStatus.
+    bool hasKeyboardStatusSubscribers() const;
 
     QJsonObject getWidgetStateJson() const;
     QJsonObject getKeyboardStatusJson() const;
