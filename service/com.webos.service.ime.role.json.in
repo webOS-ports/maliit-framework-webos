@@ -14,7 +14,8 @@
             \"service\":\"org.maliit\",
             \"outbound\":[\"com.webos.notification\",\"com.webos.service.tts\",\"com.webos.settingsservice\",\"com.webos.service.config\",
             \"com.webos.service.nlp\",\"com.webos.audio\",\"com.webos.service.applicationmanager\",\"com.webos.service.bluetooth\",
-            \"com.webos.service.mrcu\",\"org.maliit\",\"com.webos.lunasend-*\"]
+            \"com.webos.service.mrcu\",\"org.maliit\",\"com.webos.lunasend-*\",
+            \"com.webos.service.applicationManager\",\"com.palm.vibrate\"]
         },
         {
             \"service\":\"org.webosports.keyboard.dictionary\",

@@ -165,6 +165,12 @@ bool IMELunaService::hasSubscribers() const
     return !m_clientByToken.isEmpty();
 }
 
+bool IMELunaService::hasKeyboardStatusSubscribers() const
+{
+    return m_handle
+           && LSSubscriptionGetHandleSubscribersCount(m_handle, KeyboardStatusSubscriberKey) > 0;
+}
+
 void IMELunaService::broadcastToSubscribers(const QJsonObject& response)
 {
     LSErrorWrapper err;
@@ -279,7 +285,13 @@ void IMELunaService::onWidgetStateChanged(unsigned int clientId, const QMap<QStr
         m_focusChangedSinceLastBroadcast = true;
     }
 
-    if (hasSubscribers()) {
+    // Someone to tell: a remote keyboard, or a getKeyboardStatus subscriber
+    // such as the shell's cut/copy/paste overlay. Counting only the remote
+    // keyboards left the shell with the focus, selection and text it was told
+    // when it subscribed, for as long as no remote keyboard was attached: no
+    // overlay at all while that said "no focus", and the wrong items (Select
+    // over a word already selected) while it said "no selection".
+    if (hasSubscribers() || hasKeyboardStatusSubscribers()) {
         // run when event queue is empty (OK if already queued; QTimer will reschedule)
         m_broadcastTimer->setSingleShot(true);
         m_broadcastTimer->start(0);
@@ -294,8 +306,8 @@ void IMELunaService::broadcastWidgetState()
     response.insert("currentWidget", widgetState);
     response.insert("focusChanged", m_focusChangedSinceLastBroadcast);
 
-    // Broadcast if focus or widget changed
-    if (widgetState != m_lastWidgetState || m_focusChangedSinceLastBroadcast) {
+    // Broadcast if focus or widget changed, to the remote keyboards if any
+    if (hasSubscribers() && (widgetState != m_lastWidgetState || m_focusChangedSinceLastBroadcast)) {
         broadcastToSubscribers(response);
     }
 
